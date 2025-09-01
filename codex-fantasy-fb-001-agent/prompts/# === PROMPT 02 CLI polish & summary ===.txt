@@ -1,0 +1,18 @@
+# === PROMPT 02: CLI polish & summary ===
+Improve CLI and summaries:
+
+- In app/cli.py:
+  - Add --strict flag: when set, if any CSV row missing required fields, exit with error; otherwise warn and skip.
+  - Echo resolved settings values at start (from config + defaults).
+  - After writing CSV, print top 5 highest MaxBid rows and totals.
+
+- In app/validators.py:
+  - add validate_csv_rows(rows): ensure Player/Pos present, Tier int-able or missing.
+
+- In app/io.py:
+  - make CSV reader tolerant of BOM and leading/trailing spaces.
+
+- Add tests/tests_io.py:
+  - test_read_write_roundtrip()
+
+- Append to CHANGELOG.md: "Iter 2 – CLI polish, strict mode, IO roundtrip tests."

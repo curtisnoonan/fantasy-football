@@ -1,0 +1,9 @@
+# === PROMPT 04: Sample golden data & docs ===
+Add a small golden sample and instructions:
+
+- data/draft_list_golden.csv with 6 rows across positions and tiers.
+- tests/test_golden.py: run compute_max_bids on golden and assert:
+    - all MaxBid >= min_bid
+    - sum(MaxBid) <= total_cap
+- README.md: add "Golden test" section and explicit run commands.
+- Append CHANGELOG.md: "Iter 4 – Golden sample and docs."

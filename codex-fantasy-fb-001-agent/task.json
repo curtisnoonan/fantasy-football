@@ -1,0 +1,29 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Create venv & install",
+      "type": "shell",
+      "command": "python -m venv .venv && .venv\\Scripts\\python -m pip install --upgrade pip && .venv\\Scripts\\pip install -r requirements.txt",
+      "problemMatcher": []
+    },
+    {
+      "label": "Run app (default paths)",
+      "type": "shell",
+      "command": ".venv\\Scripts\\python -m app.cli --in data/draft_list.csv --out out/max_bids.csv --config config/settings.yaml",
+      "problemMatcher": []
+    },
+    {
+      "label": "Run tests",
+      "type": "shell",
+      "command": ".venv\\Scripts\\python -m pytest -q",
+      "problemMatcher": []
+    },
+    {
+      "label": "Format (black)",
+      "type": "shell",
+      "command": ".venv\\Scripts\\python -m black .",
+      "problemMatcher": []
+    }
+  ]
+}

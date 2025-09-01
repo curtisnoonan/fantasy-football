@@ -1,0 +1,59 @@
+# === PROMPT 01: Core logic & logging ===
+Add files and implement core logic and logging:
+
+Create app/config.py:
+- load_settings(path) -> pydantic model Settings:
+    total_cap: int=200
+    roster_slots: dict[str,int]
+    tier_budget_pct: dict[int,float]
+    min_bid: int=1
+- from YAML path; on missing file, return defaults above.
+
+Create app/validators.py:
+- functions to validate:
+    - total_cap >= roster size (since $1 reserve each)
+    - tier_budget_pct keys are ints 1..5 and values 0..1
+    - min_bid >= 1
+- raise ValueError with friendly messages.
+
+Create app/logic.py:
+- compute_max_bids(rows, settings) -> list[dict]:
+    rows: list of dicts with Player, Pos, Tier(optional), Note
+    Use the invariant: always reserve $1 for each remaining roster spot.
+    Track remaining_budget and remaining_slots using settings.roster_slots:
+      count only starters + FLEX for MVP; BENCH counts toward reserve $1 if included.
+    For MVP, assume all rows are potential targets and we’re allocating indicative max bids.
+    For each row:
+      - determine Tier (default 5)
+      - cap_after_reserve = remaining_budget - (remaining_slots * settings.min_bid)
+      - pct = settings.tier_budget_pct.get(Tier, settings.tier_budget_pct.get(5, 0.04))
+      - candidate = floor(max(0, cap_after_reserve) * pct)
+      - max_allowed = remaining_budget - (remaining_slots * settings.min_bid)
+      - max_bid = max(settings.min_bid, min(candidate, max_allowed))
+      - build Reason string with tier pct, reserves, and clamping info.
+      - Do not decrement remaining_slots here (MVP indicates *willingness*, not binding assignment).
+      - Do decrement remaining_budget hypothetically by max_bid for the *planning* sum to keep later rows conservative.
+    Return list of dicts: Player, Pos, Tier, MaxBid, Reason.
+
+Create app/io.py:
+- read_csv(path) -> list[dict]
+- write_csv(path, rows: list[dict[str,Any]]) with header Player,Pos,Tier,MaxBid,Reason
+
+Create app/cli.py:
+- argparse:
+    --in (default data/draft_list.csv)
+    --out (default out/max_bids.csv)
+    --config (default config/settings.yaml)
+- setup logging (RotatingFileHandler) to logs/app_YYYYMMDD_HHMMSS.log and console (INFO).
+- load settings; validate; read CSV; run compute_max_bids; write CSV.
+- print a tabulated summary: total planned spend, remaining_budget, row count.
+- on any validation/IO error: print friendly message and exit(1).
+
+Tests:
+- tests/test_logic.py:
+    - test_cap_never_exceeded()
+    - test_min_bid_reserve_invariant()
+    - test_tier_pct_applied()
+- tests/test_validators.py basic checks.
+
+Update CHANGELOG.md: "Iter 1 – Core logic, logging, initial tests."

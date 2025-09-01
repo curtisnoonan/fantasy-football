@@ -1,0 +1,44 @@
+# === PROMPT 00: Project scaffold ===
+You are generating a minimal, reliable Python project named "salary-cap-mvp" for a personal CLI.
+Create the following files and content:
+
+- requirements.txt with exact pins:
+    pydantic==2.8.2
+    PyYAML==6.0.2
+    pandas==2.2.2
+    tabulate==0.9.0
+    typing_extensions==4.12.2
+    pytest==8.2.0
+    black==24.8.0
+
+- pyproject.toml to configure black (line-length 100, include src & tests).
+
+- README.md with quickstart: venv, install, run command, tests.
+
+- CHANGELOG.md: add "Iter 0 – scaffold" with date/time placeholder.
+
+- Create directories: app/, config/, data/, logs/, out/, tests/
+
+- config/settings.yaml (initial):
+    total_cap: 200
+    roster_slots: {"QB":1,"RB":2,"WR":2,"TE":1,"FLEX":1,"DST":1,"K":1,"BENCH":6}
+    tier_budget_pct: {1: 0.35, 2: 0.25, 3: 0.15, 4: 0.08, 5: 0.04}
+    min_bid: 1
+
+- data/draft_list.csv with 10 sample rows:
+    Player,Pos,Tier,Note
+    Christian McCaffrey,RB,1,alpha
+    Bijan Robinson,RB,1,alpha
+    CeeDee Lamb,WR,1,alpha
+    Amon-Ra St. Brown,WR,1,alpha
+    Breece Hall,RB,1,alpha
+    Garrett Wilson,WR,2,stud
+    Jahmyr Gibbs,RB,2,stud
+    Travis Kelce,TE,2,legend
+    Puka Nacua,WR,2,breakout
+    Saquon Barkley,RB,2,stud
+
+- app/__init__.py (empty ok)
+- app/version.py with __version__ = "0.0.1"
+
+Append to CHANGELOG.md: "Iter 0 – Scaffolded project, config, sample data."

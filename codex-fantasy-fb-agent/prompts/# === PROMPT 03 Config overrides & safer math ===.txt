@@ -1,0 +1,16 @@
+# === PROMPT 03: Config overrides & safer math ===
+Add safer math and config behavior:
+
+- app/config.py:
+  - allow environment variable overrides: SALARY_TOTAL_CAP, SALARY_MIN_BID
+  - if tier_budget_pct values sum > 0.90, log a warning (not error).
+
+- app/logic.py:
+  - ensure we never compute negative cap_after_reserve.
+  - clamp pct to [0, 0.9]
+  - include safeguard so final planned spend <= total_cap.
+
+- tests/test_logic.py:
+  - add test_planned_spend_never_exceeds_cap()
+
+- Append CHANGELOG.md: "Iter 3 – Config overrides & safer math."
