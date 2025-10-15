@@ -1,0 +1,14 @@
+# Fantasy Football Data Manager configuration
+
+# League and season
+league_id: 123456
+season: 2024
+
+# Private league cookies (omit for public leagues)
+espn_s2: your_espn_s2_token
+swid: "{your-swid-guid}"
+
+# Paths and logging
+output_dir: data/exports
+log_dir: logs
+log_level: INFO

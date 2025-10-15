@@ -13,6 +13,7 @@ Uses only Python standard libraries.
 
 import csv
 import re
+import os
 from datetime import datetime
 from pathlib import Path
 import tkinter as tk
@@ -28,6 +29,26 @@ SAMPLE_PLAYERS = [
     "Tyreek Hill",
     "Travis Kelce",
 ]
+
+# Default PDF path provided by user
+DEFAULT_PDF_PATH = (
+    r"C:\Users\cnoonan1\Documents\GitHub\fantasy-football\codex-fantasy-fb-001-agent\PDFs\Edit Salary Cap Draft List Draft Strategy 2025.pdf"
+)
+
+# Optional, widely available PDF libraries
+try:  # PyMuPDF tends to be more robust
+    import fitz  # type: ignore
+
+    _HAS_PYMUPDF = True
+except Exception:
+    _HAS_PYMUPDF = False
+
+try:  # Fallback to PyPDF2
+    from PyPDF2 import PdfReader  # type: ignore
+
+    _HAS_PYPDF2 = True
+except Exception:
+    _HAS_PYPDF2 = False
 
 
 class DraftApp(tk.Tk):
@@ -118,13 +139,15 @@ class DraftApp(tk.Tk):
         # Controls frame (totals, cap, save/load)
         controls = ttk.Frame(self, padding=(10, 5, 10, 10))
         controls.grid(row=1, column=0, sticky="ew")
-        for i in range(7):
+        for i in range(8):
             controls.columnconfigure(i, weight=1)
 
         # Total label (value updated by _update_totals)
         ttk.Label(controls, text="Total:").grid(row=0, column=0, sticky="w")
         self.total_label = tk.Label(controls, text="$0", anchor="w")
         self.total_label.grid(row=0, column=1, sticky="w")
+        # Store default foreground color so we can restore it later
+        self._total_default_fg = self.total_label.cget("fg")
 
         # Cap label and entry
         ttk.Label(controls, text="Cap:").grid(row=0, column=2, sticky="e")
@@ -145,6 +168,21 @@ class DraftApp(tk.Tk):
         self.save_btn.grid(row=0, column=5, sticky="e", padx=(4, 4))
         self.load_btn = ttk.Button(controls, text="Load", command=self._load_from_csv)
         self.load_btn.grid(row=0, column=6, sticky="w")
+
+        # Second row of controls: Reset + PDF actions
+        ttk.Separator(controls, orient="horizontal").grid(
+            row=1, column=0, columnspan=8, sticky="ew", pady=(6, 6)
+        )
+        self.reset_btn = ttk.Button(controls, text="Reset", command=self._reset_to_defaults)
+        self.reset_btn.grid(row=2, column=0, sticky="w")
+        self.pdf_players_btn = ttk.Button(
+            controls, text="Import Players from PDF", command=self._import_players_from_pdf
+        )
+        self.pdf_players_btn.grid(row=2, column=1, columnspan=2, sticky="w")
+        self.pdf_salaries_btn = ttk.Button(
+            controls, text="Apply PDF Salaries", command=self._apply_pdf_salaries
+        )
+        self.pdf_salaries_btn.grid(row=2, column=3, columnspan=2, sticky="w")
 
     def _load_sample_rows(self):
         """Preload the table with sample players and blank salaries."""
@@ -310,8 +348,8 @@ class DraftApp(tk.Tk):
         if total > cap > 0:
             self.total_label.configure(fg="red")
         else:
-            # Use system default color by setting empty string
-            self.total_label.configure(fg="")
+            # Restore to the label's original foreground color
+            self.total_label.configure(fg=self._total_default_fg)
 
     # ------------------------------ Save / Load CSV ------------------------------
     def _save_to_csv(self):
@@ -448,6 +486,178 @@ class DraftApp(tk.Tk):
         self._log_action(f"Removed player row '{player_name}'")
         self._update_totals()
         self._configure_rows_canvas()
+
+    # --------------------------------- Resetting --------------------------------
+    def _reset_to_defaults(self):
+        """Reset the table and controls to the initial default launch state."""
+        self._clear_rows()
+        self._load_sample_rows()
+        self.cap_var.set(str(DEFAULT_CAP))
+        self._on_cap_commit()
+        self._log_action("Reset to defaults")
+
+    # -------------------------- PDF Extraction and Parse -------------------------
+    def _extract_pdf_text(self, pdf_path: str) -> str | None:
+        """Extract text from a PDF using available libraries. Return None on failure."""
+        try:
+            if _HAS_PYMUPDF:
+                try:
+                    doc = fitz.open(pdf_path)
+                    parts = []
+                    for page in doc:
+                        parts.append(page.get_text("text"))
+                    text = "\n".join(parts)
+                    # Basic quality check: at least some alphabetic content
+                    if sum(c.isalpha() for c in text) >= 100:
+                        return text
+                except Exception:
+                    pass
+            if _HAS_PYPDF2:
+                try:
+                    reader = PdfReader(pdf_path)
+                    parts = []
+                    for page in reader.pages:
+                        t = page.extract_text() or ""
+                        parts.append(t)
+                    text = "\n".join(parts)
+                    if sum(c.isalpha() for c in text) >= 100:
+                        return text
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        return None
+
+    @staticmethod
+    def _normalize_name(name: str) -> str:
+        """Normalize a player name for comparison: lowercase, strip punctuation, collapse spaces."""
+        s = name.lower()
+        s = re.sub(r"[^a-z\s]", "", s)
+        s = re.sub(r"\s+", " ", s).strip()
+        return s
+
+    def _parse_players_and_salaries(self, text: str) -> tuple[list[str], dict[str, float]]:
+        """Heuristically parse player names and salaries from PDF text.
+
+        Returns:
+            (players_list, salary_map) where salary_map maps normalized names to salary floats.
+        """
+        players: list[str] = []
+        salary_map: dict[str, float] = {}
+
+        # Try regex capturing lines with a name and a dollar amount
+        # Name: 1-4 words, starts with letter, may include apostrophes, hyphens, periods
+        name_pattern = r"([A-Za-z][A-Za-z\.'-]+(?:\s+[A-Za-z][A-Za-z\.'-]+){0,3})"
+        money_pattern = r"\$\s*(\d+(?:\.\d{1,2})?)"
+        regex_both = re.compile(name_pattern + ".{0,20}?" + money_pattern)
+
+        # Collect name+salary pairs first
+        for line in text.splitlines():
+            line = line.strip()
+            if not line or len(line) > 200:
+                continue
+            m = regex_both.search(line)
+            if m:
+                name = m.group(1).strip()
+                salary = float(m.group(2))
+                norm = self._normalize_name(name)
+                salary_map[norm] = salary
+                if name not in players:
+                    players.append(name)
+
+        # If no players found above, as a fallback try to collect lines that look like names
+        if not players:
+            # A line that has 2-4 capitalized words may be a player name
+            regex_name_only = re.compile(r"^(?:[A-Z][a-zA-Z\.'-]+\s+){1,3}[A-Z][a-zA-Z\.'-]+$")
+            for line in text.splitlines():
+                t = line.strip()
+                if 2 <= len(t.split()) <= 4 and regex_name_only.match(t):
+                    if t not in players:
+                        players.append(t)
+
+        return players, salary_map
+
+    def _import_players_from_pdf(self):
+        """Replace the current list with players parsed from the default PDF path."""
+        pdf_path = DEFAULT_PDF_PATH
+        if not os.path.isfile(pdf_path):
+            messagebox.showerror(
+                "PDF Not Found",
+                f"PDF not found at:\n{pdf_path}\n\nPlease verify the path or move the file.",
+            )
+            return
+
+        text = self._extract_pdf_text(pdf_path)
+        if not text:
+            self._log_action("PDF text extraction failed")
+            messagebox.showerror(
+                "PDF Parsing Error",
+                "Could not extract text from the PDF. If the PDF is image-based or uses non-standard fonts, please export a CSV from it and use Load, or provide a text version.",
+            )
+            return
+
+        players, _ = self._parse_players_and_salaries(text)
+        if not players:
+            messagebox.showwarning("No Players Detected", "No player names were detected in the PDF text.")
+            return
+
+        self._clear_rows()
+        for p in players:
+            self._add_row(player_name=p, salary_text="")
+        self._update_totals()
+        self._log_action(f"Imported {len(players)} players from PDF")
+
+    def _apply_pdf_salaries(self):
+        """Fill current players' salaries from the default PDF mapping when possible."""
+        pdf_path = DEFAULT_PDF_PATH
+        if not os.path.isfile(pdf_path):
+            messagebox.showerror(
+                "PDF Not Found",
+                f"PDF not found at:\n{pdf_path}\n\nPlease verify the path or move the file.",
+            )
+            return
+
+        text = self._extract_pdf_text(pdf_path)
+        if not text:
+            self._log_action("PDF text extraction failed for salaries")
+            messagebox.showerror(
+                "PDF Parsing Error",
+                "Could not extract text from the PDF to read salaries. Please provide a text/CSV version instead.",
+            )
+            return
+
+        _, salary_map = self._parse_players_and_salaries(text)
+        if not salary_map:
+            messagebox.showwarning("No Salaries Detected", "No recognizable $ salaries were found in the PDF text.")
+            return
+
+        updates = 0
+        for row in self.rows:
+            name = row["player_var"].get()
+            norm = self._normalize_name(name)
+            if norm in salary_map:
+                value = salary_map[norm]
+                prev = row["salary_var"].get()
+                row["salary_var"].set(f"{value:g}")
+                row["salary_prev"] = prev
+                # Log individual salary updates
+                self._log_action(
+                    f"Salary autofill for '{name}': {prev or '""'} -> {value:g}"
+                )
+                updates += 1
+
+        self._update_totals()
+        if updates == 0:
+            messagebox.showinfo(
+                "No Matches",
+                "No player names in the table matched entries from the PDF.",
+            )
+        else:
+            self._log_action(f"Applied PDF salaries to {updates} players")
+            messagebox.showinfo(
+                "Salaries Applied",
+                f"Applied salaries to {updates} players from the PDF.",
+            )
 
 
 if __name__ == "__main__":

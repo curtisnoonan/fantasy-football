@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+.pytest_cache/
+.venv/
+env/
+venv/
+*.pyc
+
+# Local configuration
+.env
+config.yaml
+
+# Data & logs
+data/exports/
+logs/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
