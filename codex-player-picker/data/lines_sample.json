@@ -1,0 +1,27 @@
+[
+  {
+    "player_name": "Derrick Henry",
+    "team": "TEN",
+    "pos": "RB",
+    "stat_category": "rushing_yards",
+    "line_value": 88.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Christian McCaffrey",
+    "team": "SF",
+    "pos": "RB",
+    "stat_category": "rushing_yards",
+    "line_value": 90.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Nick Chubb",
+    "team": "CLE",
+    "pos": "RB",
+    "stat_category": "rushing_yards",
+    "line_value": 79.5,
+    "source": "underdog"
+  }
+]
+

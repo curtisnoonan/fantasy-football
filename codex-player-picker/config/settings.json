@@ -1,0 +1,34 @@
+{
+  "stat_category": "rushing_yards",
+  "stat_position_filter": [
+    "RB"
+  ],
+  "recommend": {
+    "min_diff_abs": 10.0,
+    "min_diff_pct": 0.1,
+    "rule": "abs_or_pct"
+  },
+  "api": {
+    "enabled": false,
+    "endpoint_url": "",
+    "headers": {},
+    "cache_path": "data/cache/underdog_lines.json",
+    "cache_ttl_minutes": 60,
+    "offline_lines_path": "data/lines_sample.json"
+  },
+  "matching": {
+    "name_strategy": "case_insensitive",
+    "team_required": false,
+    "position_required": false
+  },
+  "output": {
+    "out_path": "out/recommended_picks.csv",
+    "include_no_bet": false
+  },
+  "projections_columns": {
+    "player_col": null,
+    "team_col": null,
+    "pos_col": null,
+    "proj_col": null
+  }
+}
