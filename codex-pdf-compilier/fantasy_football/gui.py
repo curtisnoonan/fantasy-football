@@ -1,21 +1,26 @@
 from __future__ import annotations
 
 import os
-import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
-from typing import Dict, Any, List, Tuple, Optional
+import sys
 import threading
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
-from .config import load_config, Config
-from .logging_config import setup_logging
+import tkinter as tk
+from tkinter import filedialog, messagebox, ttk
+
+from .config import Config, load_config
 from .espn_client import get_league
-from .exporters import (
-    export_rosters,
-    export_standings,
-    export_matchups,
-    export_player_stats,
-    export_free_agents,
-)
+from .exporters import export_free_agents, export_matchups, export_player_stats, export_rosters, export_standings
+from .logging_config import setup_logging
+
+# Ensure analyze_players.py importable
+try:
+    ROOT = Path(__file__).resolve().parent.parent
+    if str(ROOT) not in sys.path:
+        sys.path.insert(0, str(ROOT))
+except Exception:
+    pass
 
 try:
     from analyze_players import (
@@ -23,56 +28,25 @@ try:
         load_player_games as ap_load_player_games,
         compute_metrics as ap_compute_metrics,
         tag_categories as ap_tag_categories,
+        load_player_positions as ap_load_player_positions,
     )
-except Exception:  # pragma: no cover
+except Exception:
     ap_load_rosters = None  # type: ignore
     ap_load_player_games = None  # type: ignore
     ap_compute_metrics = None  # type: ignore
     ap_tag_categories = None  # type: ignore
-
-
-def _write_yaml(path: str, cfg: Config) -> None:
-    import yaml  # lazy import
-
-    data = {
-        "league_id": cfg.league_id,
-        "season": cfg.season,
-        "espn_s2": cfg.espn_s2,
-        "swid": cfg.swid,
-        "output_dir": cfg.output_dir,
-        "log_dir": cfg.log_dir,
-        "log_level": cfg.log_level,
-    }
-    with open(path, "w", encoding="utf-8") as f:
-        yaml.safe_dump(data, f, sort_keys=False)
-
-
-def _write_env(path: str, values: Dict[str, Any]) -> None:
-    lines = []
-    for k in ["ESPN_S2", "SWID", "LEAGUE_ID", "SEASON", "OUTPUT_DIR", "LOG_DIR", "LOG_LEVEL"]:
-        v = values.get(k)
-        if v is None:
-            continue
-        v_str = str(v)
-        if any(ch in v_str for ch in [" ", "#", "="]):
-            v_str = f'"{v_str}"'
-        lines.append(f"{k}={v_str}")
-    with open(path, "w", encoding="utf-8") as f:
-        f.write("\n".join(lines) + "\n")
+    ap_load_player_positions = None  # type: ignore
 
 
 class ConfigGUI(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
         self.title("Fantasy Football Config")
-        self.geometry("560x420")
+        self.geometry("600x420")
         self.resizable(False, False)
 
-        # Paths for saving
         self.yaml_path = tk.StringVar(value="config.yaml")
         self.env_path = tk.StringVar(value=".env")
-
-        # Form variables
         self.league_id = tk.StringVar()
         self.season = tk.StringVar()
         self.week = tk.StringVar()
@@ -82,7 +56,6 @@ class ConfigGUI(tk.Tk):
         self.log_dir = tk.StringVar(value="logs")
         self.log_level = tk.StringVar(value="INFO")
 
-        # Last export paths for analysis convenience
         self._last_paths: Dict[str, Optional[str]] = {
             "rosters": None,
             "player_stats": None,
@@ -96,9 +69,7 @@ class ConfigGUI(tk.Tk):
 
     def _build_ui(self) -> None:
         pad = {"padx": 10, "pady": 6}
-
         row = 0
-        # Config file paths
         ttk.Label(self, text="YAML Config").grid(row=row, column=0, sticky="e", **pad)
         ttk.Entry(self, textvariable=self.yaml_path, width=44).grid(row=row, column=1, **pad)
         ttk.Button(self, text="Browse", command=self._browse_yaml).grid(row=row, column=2, **pad)
@@ -106,12 +77,8 @@ class ConfigGUI(tk.Tk):
         ttk.Label(self, text=".env File").grid(row=row, column=0, sticky="e", **pad)
         ttk.Entry(self, textvariable=self.env_path, width=44).grid(row=row, column=1, **pad)
         ttk.Button(self, text="Browse", command=self._browse_env).grid(row=row, column=2, **pad)
-
-        # Separator
         row += 1
         ttk.Separator(self, orient="horizontal").grid(row=row, column=0, columnspan=3, sticky="ew", padx=10, pady=8)
-
-        # Config fields
         row += 1
         ttk.Label(self, text="League ID").grid(row=row, column=0, sticky="e", **pad)
         ttk.Entry(self, textvariable=self.league_id, width=22).grid(row=row, column=1, sticky="w", **pad)
@@ -139,58 +106,42 @@ class ConfigGUI(tk.Tk):
         ttk.Label(self, text="Log Level").grid(row=row, column=0, sticky="e", **pad)
         cb = ttk.Combobox(self, textvariable=self.log_level, values=["DEBUG", "INFO", "WARNING", "ERROR"], width=20, state="readonly")
         cb.grid(row=row, column=1, sticky="w", **pad)
-
-        # Buttons
         row += 1
         ttk.Separator(self, orient="horizontal").grid(row=row, column=0, columnspan=3, sticky="ew", padx=10, pady=8)
         row += 1
-        btn_frame = ttk.Frame(self)
-        btn_frame.grid(row=row, column=0, columnspan=3, pady=10)
-        self._btn_reload = ttk.Button(btn_frame, text="Reload", command=self._load_current)
-        self._btn_reload.grid(row=0, column=0, padx=6)
-        self._btn_save_yaml = ttk.Button(btn_frame, text="Save YAML", command=self._save_yaml)
-        self._btn_save_yaml.grid(row=0, column=1, padx=6)
-        self._btn_save_env = ttk.Button(btn_frame, text="Save .env", command=self._save_env)
-        self._btn_save_env.grid(row=0, column=2, padx=6)
-        self._btn_save_all = ttk.Button(btn_frame, text="Save All", command=self._save_all)
-        self._btn_save_all.grid(row=0, column=3, padx=6)
-        self._btn_export = ttk.Button(btn_frame, text="Export CSV (All)", command=self._export_all_bg)
-        self._btn_export.grid(row=0, column=4, padx=6)
-        self._btn_analyze = ttk.Button(btn_frame, text="Analyze Players", command=self._analyze_players_bg)
-        self._btn_analyze.grid(row=0, column=5, padx=6)
-        self._btn_close = ttk.Button(btn_frame, text="Close", command=self.destroy)
-        self._btn_close.grid(row=0, column=6, padx=6)
-
-        # Status + Progress
+        btns = ttk.Frame(self)
+        btns.grid(row=row, column=0, columnspan=3, pady=8)
+        ttk.Button(btns, text="Reload", command=self._load_current).grid(row=0, column=0, padx=6)
+        ttk.Button(btns, text="Export CSV (All)", command=self._export_all_bg).grid(row=0, column=1, padx=6)
+        ttk.Button(btns, text="Analyze Players", command=self._analyze_players_bg).grid(row=0, column=2, padx=6)
+        ttk.Button(btns, text="Close", command=self.destroy).grid(row=0, column=3, padx=6)
         row += 1
-        status_frame = ttk.Frame(self)
-        status_frame.grid(row=row, column=0, columnspan=3, sticky="ew", padx=10)
-        self.columnconfigure(0, weight=1)
-        status_frame.columnconfigure(0, weight=1)
+        status = ttk.Frame(self)
+        status.grid(row=row, column=0, columnspan=3, sticky="ew", padx=10)
         self._status_var = tk.StringVar(value="Ready")
-        ttk.Label(status_frame, textvariable=self._status_var, anchor="w").grid(row=0, column=0, sticky="w")
-        self._progress = ttk.Progressbar(status_frame, mode="determinate", maximum=3, value=0)
+        ttk.Label(status, textvariable=self._status_var, anchor="w").grid(row=0, column=0, sticky="w")
+        self._progress = ttk.Progressbar(status, mode="determinate", maximum=4, value=0)
         self._progress.grid(row=1, column=0, sticky="ew", pady=(4, 0))
 
     def _browse_yaml(self) -> None:
-        path = filedialog.asksaveasfilename(defaultextension=".yaml", filetypes=[("YAML", "*.yaml;*.yml"), ("All", "*.*")], initialfile=self.yaml_path.get())
-        if path:
-            self.yaml_path.set(path)
+        p = filedialog.asksaveasfilename(defaultextension=".yaml", filetypes=[("YAML", "*.yaml;*.yml"), ("All", "*.*")], initialfile=self.yaml_path.get())
+        if p:
+            self.yaml_path.set(p)
 
     def _browse_env(self) -> None:
-        path = filedialog.asksaveasfilename(defaultextension=".env", filetypes=[("Env", "*.env"), ("All", "*.*")], initialfile=self.env_path.get())
-        if path:
-            self.env_path.set(path)
+        p = filedialog.asksaveasfilename(defaultextension=".env", filetypes=[("Env", "*.env"), ("All", "*.*")], initialfile=self.env_path.get())
+        if p:
+            self.env_path.set(p)
 
     def _browse_output(self) -> None:
-        path = filedialog.askdirectory(initialdir=self.output_dir.get() or os.getcwd())
-        if path:
-            self.output_dir.set(path)
+        p = filedialog.askdirectory(initialdir=self.output_dir.get() or os.getcwd())
+        if p:
+            self.output_dir.set(p)
 
     def _browse_logdir(self) -> None:
-        path = filedialog.askdirectory(initialdir=self.log_dir.get() or os.getcwd())
-        if path:
-            self.log_dir.set(path)
+        p = filedialog.askdirectory(initialdir=self.log_dir.get() or os.getcwd())
+        if p:
+            self.log_dir.set(p)
 
     def _load_current(self) -> None:
         try:
@@ -198,151 +149,32 @@ class ConfigGUI(tk.Tk):
         except Exception as e:
             messagebox.showerror("Load Error", f"Failed to load config: {e}")
             return
-
-        if cfg.league_id is not None:
-            self.league_id.set(str(cfg.league_id))
-        if cfg.season is not None:
-            self.season.set(str(cfg.season))
-        if cfg.espn_s2 is not None:
+        self.league_id.set(str(cfg.league_id or ""))
+        self.season.set(str(cfg.season or ""))
+        if cfg.espn_s2:
             self.espn_s2.set(cfg.espn_s2)
-        if cfg.swid is not None:
+        if cfg.swid:
             self.swid.set(cfg.swid)
         self.output_dir.set(cfg.output_dir or "data/exports")
         self.log_dir.set(cfg.log_dir or "logs")
         self.log_level.set((cfg.log_level or "INFO").upper())
-        # Don't auto-fill week; user can specify or we infer later
 
     def _collect_values(self) -> Dict[str, Any]:
-        values: Dict[str, Any] = {}
-        # Validate integer fields
-        lid = self.league_id.get().strip()
-        season = self.season.get().strip()
-        if lid:
+        vals: Dict[str, Any] = {}
+        if (lid := self.league_id.get().strip()):
             if not lid.isdigit():
                 raise ValueError("League ID must be an integer")
-            values["LEAGUE_ID"] = int(lid)
-        if season:
+            vals["LEAGUE_ID"] = int(lid)
+        if (season := self.season.get().strip()):
             if not season.isdigit():
                 raise ValueError("Season must be an integer")
-            values["SEASON"] = int(season)
-
-        values["ESPN_S2"] = self.espn_s2.get().strip() or None
-        values["SWID"] = self.swid.get().strip() or None
-        values["OUTPUT_DIR"] = self.output_dir.get().strip() or "data/exports"
-        values["LOG_DIR"] = self.log_dir.get().strip() or "logs"
-        values["LOG_LEVEL"] = (self.log_level.get().strip() or "INFO").upper()
-        return values
-
-    def _save_yaml(self) -> None:
-        try:
-            vals = self._collect_values()
-            cfg = Config(
-                league_id=vals.get("LEAGUE_ID"),
-                season=vals.get("SEASON"),
-                espn_s2=vals.get("ESPN_S2"),
-                swid=vals.get("SWID"),
-                output_dir=vals.get("OUTPUT_DIR", "data/exports"),
-                log_dir=vals.get("LOG_DIR", "logs"),
-                log_level=vals.get("LOG_LEVEL", "INFO"),
-            )
-            _write_yaml(self.yaml_path.get(), cfg)
-            messagebox.showinfo("Saved", f"Wrote {self.yaml_path.get()}")
-        except Exception as e:
-            messagebox.showerror("Save Error", f"Failed to save YAML: {e}")
-
-    def _save_env(self) -> None:
-        try:
-            vals = self._collect_values()
-            _write_env(self.env_path.get(), vals)
-            messagebox.showinfo("Saved", f"Wrote {self.env_path.get()}")
-        except Exception as e:
-            messagebox.showerror("Save Error", f"Failed to save .env: {e}")
-
-    def _save_all(self) -> None:
-        self._save_yaml()
-        self._save_env()
-
-    # ---- Background export with progress ----
-    def _set_busy(self, busy: bool) -> None:
-        try:
-            if busy:
-                self.config(cursor="watch")
-                self._btn_export.state(["disabled"])
-                try:
-                    self._btn_analyze.state(["disabled"])
-                except Exception:
-                    pass
-            else:
-                self.config(cursor="")
-                self._btn_export.state(["!disabled"])
-                try:
-                    self._btn_analyze.state(["!disabled"])
-                except Exception:
-                    pass
-            self.update_idletasks()
-        except Exception:
-            pass
-
-    def _progress_start(self, max_steps: int) -> None:
-        self._progress.configure(maximum=max_steps, value=0, mode="determinate")
-        self._status_var.set("Starting export...")
-        self._set_busy(True)
-
-    def _progress_step(self, message: str = "") -> None:
-        val = int(self._progress["value"]) + 1
-        self._progress.configure(value=val)
-        if message:
-            self._status_var.set(message)
-
-    def _progress_finish(self, message: str = "Done") -> None:
-        self._progress.configure(value=self._progress["maximum"]) 
-        self._status_var.set(message)
-        self._set_busy(False)
-
-    def _perform_export(self, cfg: Config, week_val: Optional[int]) -> Tuple[bool, List[Tuple[str, str]], Optional[str]]:
-        outputs: List[Tuple[str, str]] = []
-        try:
-            # Determine steps count: rosters, standings, player stats, free agents, + matchups if week
-            max_steps = 4 + (1 if week_val is not None else 0)
-            self.after(0, lambda: self._progress_start(max_steps))
-            # Connect
-            self.after(0, lambda: self._status_var.set("Connecting to league..."))
-            league = get_league(cfg)
-            # Rosters
-            self.after(0, lambda: self._progress_step("Exporting rosters..."))
-            r_path = export_rosters(league, cfg.output_dir, cfg.season or 0)
-            outputs.append(("Rosters", r_path))
-            self._last_paths["rosters"] = r_path
-            # Standings
-            self.after(0, lambda: self._progress_step("Exporting standings..."))
-            s_path = export_standings(league, cfg.output_dir, cfg.season or 0)
-            outputs.append(("Standings", s_path))
-            self._last_paths["standings"] = s_path
-            # Player stats (all weeks if week_val is None)
-            self.after(0, lambda: self._progress_step("Exporting player stats..."))
-            p_path = export_player_stats(league, cfg.output_dir, cfg.season or 0, weeks=[week_val] if week_val is not None else None)
-            outputs.append(("Player Stats", p_path))
-            self._last_paths["player_stats"] = p_path
-
-            # Free agents (use specified week if provided for a snapshot)
-            self.after(0, lambda: self._progress_step("Exporting free agents..."))
-            fa_path = export_free_agents(league, cfg.output_dir, cfg.season or 0, week=week_val)
-            outputs.append(("Free Agents", fa_path))
-            self._last_paths["free_agents"] = fa_path
-
-            # Matchups
-            if week_val is not None:
-                self.after(0, lambda: self._progress_step(f"Exporting matchups (week {week_val})..."))
-                m_path = export_matchups(league, cfg.output_dir, cfg.season or 0, week_val)
-                outputs.append((f"Matchups (week {week_val})", m_path))
-                self._last_paths["matchups"] = m_path
-            else:
-                outputs.append(("Matchups", "Skipped (no week specified or inferred)"))
-            return True, outputs, None
-        except Exception as e:
-            return False, outputs, str(e)
-        finally:
-            self.after(0, lambda: self._progress_finish("Export complete"))
+            vals["SEASON"] = int(season)
+        vals["ESPN_S2"] = self.espn_s2.get().strip() or None
+        vals["SWID"] = self.swid.get().strip() or None
+        vals["OUTPUT_DIR"] = self.output_dir.get().strip() or "data/exports"
+        vals["LOG_DIR"] = self.log_dir.get().strip() or "logs"
+        vals["LOG_LEVEL"] = (self.log_level.get().strip() or "INFO").upper()
+        return vals
 
     def _export_all_bg(self) -> None:
         try:
@@ -363,107 +195,59 @@ class ConfigGUI(tk.Tk):
 
             week_str = self.week.get().strip()
             week_val = int(week_str) if week_str.isdigit() else None
-            # If no week provided, try to infer after connecting (handled in worker)
 
-            def worker():
-                nonlocal week_val
-                # If week is None, attempt inference (requires a league), handled inside _perform_export via get_league
-                # But we need league to infer; we handle inference before exporters here for simplicity only if possible.
-                # Leave inference to exporter stage using league.current_week.
-                if week_val is None:
-                    # We'll let _perform_export infer via league, see logic there (sets skipped if still None)
-                    pass
-                success, outputs, err = self._perform_export(cfg, week_val)
-                def show_result():
-                    if success:
-                        msg_lines = ["Export complete:"] + [f"- {name}: {path}" for name, path in outputs]
-                        messagebox.showinfo("Export", "\n".join(msg_lines))
+            def worker() -> None:
+                try:
+                    self.after(0, lambda: self._status_var.set("Connecting to league..."))
+                    league = get_league(cfg)
+                    if week_val is None:
+                        cw = getattr(league, "current_week", None)
+                        if cw is not None:
+                            week = int(cw)
+                            self.after(0, lambda: self.week.set(str(week)))
+                            week_val_local = week
+                        else:
+                            week_val_local = None
                     else:
-                        messagebox.showerror("Export Error", err or "Unknown error")
-                self.after(0, show_result)
+                        week_val_local = week_val
 
+                    self.after(0, lambda: self._progress_start(4 + (1 if week_val_local is not None else 0)))
+                    self.after(0, lambda: self._progress_step("Exporting rosters..."))
+                    r_path = export_rosters(league, cfg.output_dir, cfg.season or 0)
+                    self._last_paths["rosters"] = r_path
+                    self.after(0, lambda: self._progress_step("Exporting standings..."))
+                    s_path = export_standings(league, cfg.output_dir, cfg.season or 0)
+                    self._last_paths["standings"] = s_path
+                    self.after(0, lambda: self._progress_step("Exporting player stats (all weeks)..."))
+                    p_path = export_player_stats(league, cfg.output_dir, cfg.season or 0, weeks=None)
+                    self._last_paths["player_stats"] = p_path
+                    self.after(0, lambda: self._progress_step("Exporting free agents..."))
+                    fa_path = export_free_agents(league, cfg.output_dir, cfg.season or 0, week=week_val_local)
+                    self._last_paths["free_agents"] = fa_path
+                    if week_val_local is not None:
+                        self.after(0, lambda: self._progress_step(f"Exporting matchups (week {week_val_local})..."))
+                        m_path = export_matchups(league, cfg.output_dir, cfg.season or 0, week_val_local)
+                        self._last_paths["matchups"] = m_path
+                    self.after(0, lambda: self._progress_finish("Export complete"))
+                    self.after(0, lambda: messagebox.showinfo("Export", "Export complete."))
+                except Exception as e:
+                    self.after(0, lambda: messagebox.showerror("Export Error", str(e)))
             threading.Thread(target=worker, daemon=True).start()
         except Exception as e:
             messagebox.showerror("Export Error", f"Failed to start export: {e}")
 
-    def _export_all(self) -> None:
-        # Perform export of rosters, standings, and matchups (if week is available)
-        try:
-            vals = self._collect_values()
-            # Require league and season
-            if "LEAGUE_ID" not in vals or "SEASON" not in vals:
-                raise ValueError("League ID and Season are required to export")
-
-            cfg = Config(
-                league_id=vals.get("LEAGUE_ID"),
-                season=vals.get("SEASON"),
-                espn_s2=vals.get("ESPN_S2"),
-                swid=vals.get("SWID"),
-                output_dir=vals.get("OUTPUT_DIR", "data/exports"),
-                log_dir=vals.get("LOG_DIR", "logs"),
-                log_level=vals.get("LOG_LEVEL", "INFO"),
-            )
-
-            # Setup logging minimally; GUI is primary UX but logs still helpful
-            setup_logging(cfg.log_dir, cfg.log_level)
-
-            # Long-ish operation: indicate busy cursor
-            self.config(cursor="watch")
-            self.update_idletasks()
-
-            league = get_league(cfg)
-
-            outputs = []
-            r_path = export_rosters(league, cfg.output_dir, cfg.season or 0)
-            outputs.append(("Rosters", r_path))
-            s_path = export_standings(league, cfg.output_dir, cfg.season or 0)
-            outputs.append(("Standings", s_path))
-
-            week_str = self.week.get().strip()
-            week_val = int(week_str) if week_str.isdigit() else None
-            if week_val is None:
-                cw = getattr(league, "current_week", None)
-                if isinstance(cw, int):
-                    week_val = cw
-
-            if week_val is not None:
-                m_path = export_matchups(league, cfg.output_dir, cfg.season or 0, week_val)
-                outputs.append((f"Matchups (week {week_val})", m_path))
-            else:
-                outputs.append(("Matchups", "Skipped (no week specified or inferred)"))
-
-            msg_lines = ["Export complete:"] + [f"- {name}: {path}" for name, path in outputs]
-            messagebox.showinfo("Export", "\n".join(msg_lines))
-        except Exception as e:
-            messagebox.showerror("Export Error", f"Failed to export: {e}")
-        finally:
-            self.config(cursor="")
-            self.update_idletasks()
-
-    # ---- Analysis ----
     def _analyze_players_bg(self) -> None:
-        """Analyze players using last exported CSVs or prompt to select files."""
-        if ap_load_rosters is None or ap_load_player_games is None or ap_compute_metrics is None or ap_tag_categories is None:
+        if any(x is None for x in (ap_load_rosters, ap_load_player_games, ap_compute_metrics, ap_tag_categories)):
             messagebox.showerror("Analyze Error", "Analysis module not available. Ensure analyze_players.py exists.")
             return
-
         players_csv = self._last_paths.get("player_stats") or ""
         rosters_csv = self._last_paths.get("rosters") or ""
-
         if not players_csv or not os.path.exists(players_csv):
-            players_csv = filedialog.askopenfilename(
-                title="Select Players CSV",
-                initialdir=self.output_dir.get() or os.getcwd(),
-                filetypes=[("CSV", "*.csv"), ("All", "*.*")],
-            )
+            players_csv = filedialog.askopenfilename(title="Select Players CSV", initialdir=self.output_dir.get() or os.getcwd(), filetypes=[("CSV", "*.csv"), ("All", "*.*")])
             if not players_csv:
                 return
         if not rosters_csv or not os.path.exists(rosters_csv):
-            rosters_csv = filedialog.askopenfilename(
-                title="Select Rosters CSV",
-                initialdir=self.output_dir.get() or os.getcwd(),
-                filetypes=[("CSV", "*.csv"), ("All", "*.*")],
-            )
+            rosters_csv = filedialog.askopenfilename(title="Select Rosters CSV", initialdir=self.output_dir.get() or os.getcwd(), filetypes=[("CSV", "*.csv"), ("All", "*.*")])
             if not rosters_csv:
                 return
 
@@ -471,15 +255,30 @@ class ConfigGUI(tk.Tk):
             try:
                 self.after(0, lambda: self._status_var.set("Analyzing players..."))
                 self.after(0, lambda: self._set_busy(True))
-                ownership = ap_load_rosters(rosters_csv)
-                games = ap_load_player_games(players_csv)
+                ownership = ap_load_rosters(rosters_csv)  # type: ignore[misc]
+                games = ap_load_player_games(players_csv)  # type: ignore[misc]
                 metrics: List[Any] = []  # type: ignore[name-defined]
                 for name, glist in games.items():
                     team = ownership.get(name.lower(), "Free Agent")
-                    m = ap_compute_metrics(name, team, glist)
+                    m = ap_compute_metrics(name, team, glist)  # type: ignore[misc]
                     metrics.append(m)
-                annotated, cats = ap_tag_categories(metrics)
-                self.after(0, lambda: self._show_analysis_window(annotated, cats, players_csv, rosters_csv))
+                # Enrich positions using players CSV
+                try:
+                    pos_map = ap_load_player_positions(players_csv)  # type: ignore[misc]
+                    import re as _re
+                    for m in metrics:
+                        base = _re.sub(r"\s*\(IR\s*(?:-\s*[^\)]*)?\)\s*$", "", getattr(m, "name", ""))
+                        pos_list = pos_map.get(base.lower(), []) if isinstance(pos_map, dict) else []
+                        if pos_list:
+                            from collections import Counter as _Counter
+                            counts = _Counter([p.strip() for p in pos_list if p and p.strip()])
+                            if counts:
+                                setattr(m, "position", max(counts.items(), key=lambda kv: (kv[1], kv[0]))[0])
+                except Exception:
+                    pass
+
+                annotated, _cats = ap_tag_categories(metrics)  # type: ignore[misc]
+                self.after(0, lambda: self._show_recommendations(annotated, players_csv, rosters_csv))
             except Exception as e:
                 self.after(0, lambda: messagebox.showerror("Analyze Error", f"Failed to analyze: {e}"))
             finally:
@@ -487,128 +286,331 @@ class ConfigGUI(tk.Tk):
 
         threading.Thread(target=worker, daemon=True).start()
 
-    def _show_analysis_window(self, metrics: List[Any], cats: Dict[str, List[Any]], players_csv: str, rosters_csv: str) -> None:
-        """Display analyzed player metrics in a new window with a table and summaries."""
+    def _show_recommendations(self, metrics: List[Any], players_csv: str, rosters_csv: str) -> None:
         win = tk.Toplevel(self)
         win.title("Analysis Results")
-        win.geometry("980x560")
-        win.minsize(860, 460)
+        win.geometry("1024x600")
 
-        # Header
-        info = ttk.Frame(win)
-        info.pack(fill="x", padx=10, pady=(10, 6))
-        ttk.Label(info, text=f"Players: {len(metrics)}").pack(side="left")
-        ttk.Label(info, text=f"  |  Players CSV: {os.path.basename(players_csv)}").pack(side="left", padx=(10, 0))
-        ttk.Label(info, text=f"  |  Rosters CSV: {os.path.basename(rosters_csv)}").pack(side="left", padx=(10, 0))
+        # Build IR + bye maps and infer current week
+        import csv as _csv, re as _re
+        ir_map: Dict[str, str] = {}
+        current_week_val: Optional[int] = None
+        try:
+            with open(players_csv, "r", encoding="utf-8") as f:
+                rdr = _csv.DictReader(f)
+                if rdr.fieldnames and "current_week" in rdr.fieldnames:
+                    for row in rdr:
+                        cw = (row.get("current_week") or "").strip()
+                        if cw.isdigit():
+                            current_week_val = int(cw)
+                            break
+        except Exception:
+            pass
+        try:
+            with open(rosters_csv, "r", encoding="utf-8") as f:
+                rdr = _csv.DictReader(f)
+                if rdr.fieldnames:
+                    for row in rdr:
+                        raw = (row.get("player_name") or "").strip()
+                        base = _re.sub(r"\s*\(IR\s*(?:-\s*[^\)]*)?\)\s*$", "", raw)
+                        inj = (row.get("injury_status") or "").strip().upper()
+                        dur = (row.get("ir_duration") or "").strip()
+                        if base and ("IR" in inj or "INJURY_RESERVE" in inj or "INJURED_RESERVE" in inj):
+                            ir_map[base.lower()] = f"IR - {dur}" if dur else "IR"
+                        if current_week_val is None and "current_week" in (rdr.fieldnames or []):
+                            cw = (row.get("current_week") or "").strip()
+                            if cw.isdigit():
+                                current_week_val = int(cw)
+        except Exception:
+            pass
+        player_bye: Dict[str, Optional[int]] = {}
+        try:
+            with open(players_csv, "r", encoding="utf-8") as f:
+                rdr = _csv.DictReader(f)
+                if rdr.fieldnames:
+                    for row in rdr:
+                        raw = (row.get("player_name") or row.get("name") or row.get("player") or "").strip()
+                        if not raw:
+                            continue
+                        base = _re.sub(r"\s*\(IR\s*(?:-\s*[^\)]*)?\)\s*$", "", raw)
+                        bw = (row.get("bye_week") or row.get("byeWeek") or "").strip()
+                        if base and bw.isdigit() and base.lower() not in player_bye:
+                            player_bye[base.lower()] = int(bw)
+        except Exception:
+            pass
 
-        # Table area
+        # Supplement IR map using players CSV (injury_status or lineup_slot IR)
+        try:
+            with open(players_csv, "r", encoding="utf-8") as f:
+                rdr = _csv.DictReader(f)
+                if rdr.fieldnames:
+                    for row in rdr:
+                        raw = (row.get("player_name") or row.get("name") or row.get("player") or "").strip()
+                        if not raw:
+                            continue
+                        base = _re.sub(r"\s*\(IR\s*(?:-\s*[^\)]*)?\)\s*$", "", raw)
+                        inj = (row.get("injury_status") or row.get("injuryStatus") or "").strip().upper()
+                        slot = (row.get("lineup_slot") or row.get("slot_position") or "").strip().upper()
+                        dur = (row.get("ir_duration") or row.get("IR_duration") or "").strip()
+                        ir_flag = False
+                        if ("IR" in inj) or ("INJURY_RESERVE" in inj) or ("INJURED_RESERVE" in inj):
+                            ir_flag = True
+                        if slot.startswith("IR"):
+                            ir_flag = True
+                        if base and ir_flag and base.lower() not in ir_map:
+                            ir_map[base.lower()] = f"IR - {dur}" if dur else "IR"
+        except Exception:
+            pass
+
+        # UI: Filters and table
+        picker = ttk.Frame(win)
+        picker.pack(fill="x", padx=10, pady=(10, 0))
+        ttk.Label(picker, text="My Team:").pack(side="left")
+        teams: List[str] = []
+        try:
+            with open(rosters_csv, "r", encoding="utf-8") as f:
+                rdr = _csv.DictReader(f)
+                if rdr.fieldnames and "team_name" in rdr.fieldnames:
+                    teams = sorted({(row.get("team_name") or "").strip() for row in rdr if (row.get("team_name") or "").strip()})
+        except Exception:
+            teams = []
+        my_team_var = tk.StringVar(value=teams[0] if teams else "")
+        ttk.Combobox(picker, textvariable=my_team_var, values=teams, width=26, state=("readonly" if teams else "disabled")).pack(side="left", padx=(6, 0))
+        only_rec_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(picker, text="Show only recommended", variable=only_rec_var).pack(side="left", padx=(12, 0))
+
         table_frame = ttk.Frame(win)
-        table_frame.pack(fill="both", expand=True, padx=10, pady=6)
-        columns = (
-            "player_name",
-            "team",
-            "games",
-            "total_points",
-            "expected_points",
-            "avg_points",
-            "recent_avg",
-            "stdev",
-            "ratio",
-            "delta",
-            "category",
-        )
+        table_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        columns = ("player_name", "rec", "ir", "pos", "team", "games", "total_points", "avg_points", "recent_avg", "ratio", "category")
         tree = ttk.Treeview(table_frame, columns=columns, show="headings")
-        vsb = ttk.Scrollbar(table_frame, orient="vertical", command=tree.yview)
-        hsb = ttk.Scrollbar(table_frame, orient="horizontal", command=tree.xview)
-        tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
-        tree.grid(row=0, column=0, sticky="nsew")
-        vsb.grid(row=0, column=1, sticky="ns")
-        hsb.grid(row=1, column=0, sticky="ew")
-        table_frame.rowconfigure(0, weight=1)
-        table_frame.columnconfigure(0, weight=1)
-
-        headers = {
+        heads = {
             "player_name": "Player",
+            "rec": "",
+            "ir": "IR",
+            "pos": "Pos",
             "team": "Team",
             "games": "Games",
             "total_points": "Total",
-            "expected_points": "Expected",
             "avg_points": "Avg",
-            "recent_avg": "Recent Avg",
-            "stdev": "Stdev",
+            "recent_avg": "Recent",
             "ratio": "Ratio",
-            "delta": "Delta",
             "category": "Category",
         }
-        widths = {
-            "player_name": 200,
-            "team": 170,
-            "games": 60,
-            "total_points": 90,
-            "expected_points": 100,
-            "avg_points": 80,
-            "recent_avg": 90,
-            "stdev": 80,
-            "ratio": 70,
-            "delta": 80,
-            "category": 110,
-        }
-        for key in columns:
-            tree.heading(key, text=headers[key])
-            tree.column(key, width=widths[key], anchor="w")
+        widths = {"player_name": 220, "rec": 28, "ir": 90, "pos": 70, "team": 160, "games": 60, "total_points": 90, "avg_points": 80, "recent_avg": 90, "ratio": 70, "category": 110}
+        for k in columns:
+            tree.heading(k, text=heads.get(k, k))
+            tree.column(k, width=widths.get(k, 80), anchor=("center" if k == "rec" else "w"))
+        vsb = ttk.Scrollbar(table_frame, orient="vertical", command=tree.yview)
+        tree.configure(yscrollcommand=vsb.set)
+        tree.grid(row=0, column=0, sticky="nsew")
+        vsb.grid(row=0, column=1, sticky="ns")
+        table_frame.rowconfigure(0, weight=1)
+        table_frame.columnconfigure(0, weight=1)
 
-        def cat_order(cat: str) -> int:
-            if not cat:
-                return 3
-            c = cat.lower()
-            if "waiver" in c:
-                return 0
-            if "buy-low" in c:
-                return 1
-            if "sell-high" in c:
-                return 2
-            return 3
+        # Scoring
+        def rec_score_and_reasons(m: Any, ir: str) -> Tuple[int, List[str]]:
+            score = 0
+            reasons: List[str] = []
+            cat = (getattr(m, "category", "") or "").lower()
+            if "waiver" in cat:
+                score += 3; reasons.append("Waiver (+3)")
+            if "buy-low" in cat:
+                score += 2; reasons.append("Buy-Low (+2)")
+            if "sell-high" in cat:
+                score -= 3; reasons.append("Sell-High (-3)")
+            recent = float(getattr(m, "recent_avg", 0) or 0)
+            ratio = float(getattr(m, "ratio", 0) or 0)
+            if (getattr(m, "team", "") or "").strip().lower() == "free agent":
+                if recent >= 8: score += 1; reasons.append(f"FA {round(recent,1)} ppg (+1)")
+                elif recent <= 3: score -= 1; reasons.append(f"FA {round(recent,1)} ppg (-1)")
+            if getattr(m, "total_expected", 0) and ratio < 0.85:
+                score += 1; reasons.append(f"Undervalued {round(ratio,2)} (+1)")
+            if getattr(m, "total_expected", 0) and ratio > 1.2:
+                score -= 1; reasons.append(f"Overvalued {round(ratio,2)} (-1)")
+            # IR penalty
+            def _parse_ir(ir_s: str) -> Optional[int]:
+                s = (ir_s or "").lower()
+                if not s or s == "ir":
+                    return None
+                if "season" in s:
+                    return 99
+                import re as __re
+                m2 = __re.search(r"(\d+)\s*w", s)
+                if m2:
+                    try:
+                        return int(m2.group(1))
+                    except Exception:
+                        return None
+                m3 = __re.search(r"until\s*wk\s*(\d{1,2})", s)
+                if m3 and current_week_val is not None:
+                    try:
+                        wk = int(m3.group(1))
+                        return max(0, wk - int(current_week_val))
+                    except Exception:
+                        return None
+                return None
+            w = _parse_ir(ir)
+            if w is not None:
+                if w >= 4: score -= 4; reasons.append(f"IR ~{w}w (-4)")
+                elif w >= 2: score -= 2; reasons.append(f"IR ~{w}w (-2)")
+                elif w >= 1: score -= 1; reasons.append(f"IR ~{w}w (-1)")
+            elif (ir or "").strip():
+                score -= 2; reasons.append("IR (unspecified) (-2)")
+            return score, reasons
 
-        disp = sorted(metrics, key=lambda m: (cat_order(m.category), -float(m.ratio or 0)))
-        for m in disp:
-            ratio_val = round(m.ratio, 3) if m.total_expected > 0 else ""
-            tree.insert(
-                "",
-                "end",
-                values=(
-                    m.name,
-                    m.team or "Free Agent",
-                    m.games,
-                    round(m.total_actual, 3),
-                    round(m.total_expected, 3),
-                    round(m.avg_actual, 3),
-                    round(m.recent_avg, 3),
-                    round(m.stdev_actual, 3),
-                    ratio_val,
-                    round(m.delta, 3),
-                    m.category,
-                ),
-            )
+        # Build my-team map
+        def load_my_team_map(team_name: str) -> Dict[str, str]:
+            mp: Dict[str, str] = {}
+            try:
+                with open(rosters_csv, "r", encoding="utf-8") as f:
+                    rdr = _csv.DictReader(f)
+                    if not rdr.fieldnames:
+                        return {}
+                    for row in rdr:
+                        if (row.get("team_name") or "").strip() != team_name:
+                            continue
+                        raw = (row.get("player_name") or "").strip()
+                        base = _re.sub(r"\s*\(IR\s*(?:-\s*[^\)]*)?\)\s*$", "", raw)
+                        pos = (row.get("position") or "").strip()
+                        if base:
+                            mp[base.lower()] = pos
+            except Exception:
+                return {}
+            return mp
 
-        # Top categories summary
-        cats_frame = ttk.LabelFrame(win, text="Top Targets")
-        cats_frame.pack(fill="x", padx=10, pady=(0, 10))
+        metrics_by_name: Dict[str, Any] = {(getattr(x, "name", "").strip().lower()): x for x in metrics}
 
-        def list_cat(label: str, key: str) -> None:
-            items = cats.get(key, []) or []
-            if key == "waiver":
-                text = ", ".join([f"{m.name} ({round(m.recent_avg,1)} ppg)" for m in items]) or "(none)"
+        def suggest_replacements(candidate: Any, my_team: str) -> List[str]:
+            if not my_team:
+                return ["Set 'My Team' to see suggestions"]
+            my_map = load_my_team_map(my_team)
+            cpos = (getattr(candidate, "position", "") or "").strip().upper()
+            if cpos in ("D/ST", "DST"):
+                cpos = "DST"
+            items: List[tuple[str, str, float, float]] = []
+            for nm_lower, pos in my_map.items():
+                pos_u = (pos or "").upper()
+                pos_u = "DST" if pos_u in ("D/ST", "DST") else pos_u
+                if cpos and pos_u and pos_u != cpos:
+                    continue
+                mm = metrics_by_name.get(nm_lower)
+                if not mm:
+                    continue
+                recent = float(getattr(mm, "recent_avg", 0) or 0)
+                ratio = float(getattr(mm, "ratio", 0) or 0)
+                items.append((nm_lower, pos_u or cpos or "", recent, ratio))
+            items.sort(key=lambda t: (t[2], t[3]))
+            out: List[str] = []
+            for nm_lower, pos_u, recent, ratio in items:
+                if nm_lower == getattr(candidate, "name", "").strip().lower():
+                    continue
+                out.append(f"- {nm_lower.title()} ({pos_u}) — {round(recent,1)} ppg, ratio {round(ratio,2)}")
+                if len(out) >= 3:
+                    break
+            if not out:
+                out = ["No obvious worse same-pos players on your team"]
+            return out
+
+        row_tips: Dict[str, str] = {}
+
+        def refresh_table() -> None:
+            for iid in tree.get_children():
+                tree.delete(iid)
+            for m in metrics:
+                base = _re.sub(r"\s*\(IR\s*(?:-\s*[^\)]*)?\)\s*$", "", getattr(m, "name", ""))
+                ir = ir_map.get(base.lower(), "")
+                score, reasons = rec_score_and_reasons(m, ir)
+                rec_sym = "🟩" if score >= 2 else ""
+                if only_rec_var.get() and not rec_sym:
+                    continue
+                ratio_val = round(float(getattr(m, "ratio", 0) or 0), 3) if getattr(m, "total_expected", 0) else ""
+                values = (
+                    getattr(m, "name", ""), rec_sym, ir, (getattr(m, "position", "") or ""), getattr(m, "team", "") or "Free Agent",
+                    getattr(m, "games", 0), round(float(getattr(m, "total_actual", 0) or 0), 3), round(float(getattr(m, "avg_actual", 0) or 0), 3),
+                    round(float(getattr(m, "recent_avg", 0) or 0), 3), ratio_val, getattr(m, "category", "")
+                )
+                iid = tree.insert("", "end", values=values)
+                if rec_sym:
+                    tip_lines: List[str] = []
+                    pos_txt = (getattr(m, "position", "") or "").strip()
+                    tip_lines.append(f"Add: {getattr(m,'name','')}" + (f" · {pos_txt}" if pos_txt else ""))
+                    if ir:
+                        tip_lines.append(f"IR: {ir}")
+                    bw = player_bye.get(base.lower())
+                    if bw is not None:
+                        if current_week_val is not None and bw == current_week_val:
+                            tip_lines.append(f"Bye: Wk {bw} (this week)")
+                        else:
+                            tip_lines.append(f"Bye: Wk {bw}")
+                    tip_lines.append(f"Recent {round(float(getattr(m,'recent_avg',0) or 0),1)} ppg, Ratio {round(float(getattr(m,'ratio',0) or 0),2) if getattr(m,'total_expected',0)>0 else 0}")
+                    tip_lines.append("Signals: " + "; ".join(reasons))
+                    tip_lines.append("")
+                    tip_lines.append("Suggested replacements:")
+                    for s in suggest_replacements(m, my_team_var.get() or ""):
+                        tip_lines.append(s)
+                    row_tips[iid] = "\n".join(tip_lines)
+
+        refresh_table()
+        only_rec_var.trace_add("write", lambda *args: refresh_table())
+        my_team_var.trace_add("write", lambda *args: refresh_table())
+
+        # Tooltip for Rec
+        tip_win: Optional[tk.Toplevel] = None
+        tip_lbl: Optional[tk.Label] = None
+        rec_col_id = f"#{columns.index('rec')+1}"
+
+        def hide_tip() -> None:
+            nonlocal tip_win, tip_lbl
+            if tip_win is not None:
+                try:
+                    tip_win.destroy()
+                except Exception:
+                    pass
+                tip_win = None
+                tip_lbl = None
+
+        def show_tip(text: str, x: int, y: int) -> None:
+            nonlocal tip_win, tip_lbl
+            if not text:
+                hide_tip(); return
+            if tip_win is None:
+                tip_win = tk.Toplevel(win)
+                tip_win.wm_overrideredirect(True)
+                tip_win.attributes("-topmost", True)
+                tip_lbl = tk.Label(tip_win, text=text, justify="left", background="#ffffe0", relief="solid", borderwidth=1, padx=6, pady=4)
+                tip_lbl.pack()
             else:
-                # show ratio %
-                text = ", ".join([f"{m.name} ({round(m.ratio*100,1)}%)" for m in items]) or "(none)"
-            row = ttk.Frame(cats_frame)
-            row.pack(fill="x", padx=8, pady=2)
-            ttk.Label(row, text=f"{label}:", width=20).pack(side="left")
-            ttk.Label(row, text=text).pack(side="left")
+                try:
+                    tip_lbl.configure(text=text)  # type: ignore[union-attr]
+                except Exception:
+                    pass
+            try:
+                tip_win.wm_geometry(f"+{x+12}+{y+12}")
+            except Exception:
+                pass
 
-        list_cat("Waiver Targets", "waiver")
-        list_cat("Buy-Low Targets", "buy_low")
-        list_cat("Sell-High Targets", "sell_high")
+        def on_move(event: tk.Event) -> None:  # type: ignore[name-defined]
+            try:
+                col = tree.identify_column(event.x)
+                row = tree.identify_row(event.y)
+                if col == rec_col_id and row in row_tips and row_tips.get(row):
+                    show_tip(row_tips.get(row, ""), event.x_root, event.y_root)  # type: ignore[attr-defined]
+                else:
+                    hide_tip()
+            except Exception:
+                hide_tip()
+
+        tree.bind("<Motion>", on_move)
+        tree.bind("<Leave>", lambda e: hide_tip())
+
+
+def main() -> None:
+    app = ConfigGUI()
+    app.mainloop()
+
+
+if __name__ == "__main__":
+    main()
 
 
 def main() -> None:

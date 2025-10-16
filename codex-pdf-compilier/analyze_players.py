@@ -17,10 +17,12 @@ Usage example:
 import argparse
 import csv
 import os
+import re
 import sys
 from dataclasses import dataclass
 from statistics import pstdev
 from typing import Dict, Iterable, List, Optional, Tuple
+from collections import Counter, defaultdict
 
 
 # ----------------------------- Types & Models ------------------------------
@@ -56,6 +58,8 @@ class PlayerMetrics:
     ratio: float
     delta: float  # total_actual - total_expected
     category: str  # "Waiver" / "Buy-Low" / "Sell-High" / "" (may include multiple, semicolon-separated)
+    position: str = ""  # primary position (most common)
+    positions_all: str = ""  # all observed positions joined (e.g., "WR/RB")
 
 
 # ----------------------------- Utilities ----------------------------------
@@ -100,6 +104,21 @@ def _to_int(val: object, default: int = 0) -> int:
         return default
 
 
+def _strip_ir_suffix(name: str) -> str:
+    """Remove trailing IR annotation from a name, e.g., "Name (IR - 3w)" -> "Name".
+
+    Keeps internal spaces and trims the result.
+    """
+    if not isinstance(name, str):
+        return name
+    s = name.strip()
+    # Match variants like: (IR), (IR-3w), (IR - 3w), (IR - until Wk 10)
+    m = re.match(r"^(.*?)(?:\s*\(IR\s*(?:-\s*[^\)]*)?\))\s*$", s, flags=re.IGNORECASE)
+    if m:
+        return m.group(1).strip()
+    return s
+
+
 # ----------------------------- Data Loading --------------------------------
 
 
@@ -120,7 +139,8 @@ def load_rosters(rosters_csv: str) -> Dict[str, str]:
         if not p_col or not t_col:
             return ownership
         for row in reader:
-            pname = (row.get(p_col) or "").strip()
+            raw_name = (row.get(p_col) or "").strip()
+            pname = _strip_ir_suffix(raw_name)
             tname = (row.get(t_col) or "").strip()
             if pname:
                 ownership[pname.lower()] = tname or "Free Agent"
@@ -155,11 +175,23 @@ def load_player_games(players_csv: str) -> Dict[str, List[PlayerGame]]:
             "projection",
         ])
         w_col = _find_col(reader.fieldnames, ["week", "date"])  # optional, for ordering
+        bye_col = _find_col(reader.fieldnames, ["bye_week", "byeWeek"])  # optional, to skip byes
 
         for row in reader:
             name = (row.get(p_col) or "").strip() if p_col else ""
             if not name:
                 continue
+            # Determine if the row is a bye week for this player
+            wk_val = row.get(w_col) if w_col else None
+            bye_val = row.get(bye_col) if bye_col else None
+            try:
+                if wk_val is not None and bye_val is not None and str(wk_val).strip() != "" and str(bye_val).strip() != "":
+                    if int(str(wk_val).strip()) == int(str(bye_val).strip()):
+                        # Skip bye weeks from aggregates
+                        continue
+            except Exception:
+                pass
+
             actual = _to_float(row.get(a_col), 0.0) if a_col else 0.0
             expected = _to_float(row.get(e_col), 0.0) if e_col else 0.0
 
@@ -177,6 +209,45 @@ def load_player_games(players_csv: str) -> Dict[str, List[PlayerGame]]:
     for glist in games.values():
         glist.sort(key=lambda g: g.order_key)
     return games
+
+
+def load_player_positions(players_csv: str) -> Dict[str, List[str]]:
+    """Load observed positions per player from the players CSV.
+
+    Returns a dict mapping lower(name) -> list of observed positions (may include duplicates).
+    Uses 'position' column if available; falls back to 'lineup_slot' when needed.
+    """
+
+    pos_map: Dict[str, List[str]] = defaultdict(list)
+    with open(players_csv, "r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        if reader.fieldnames is None:
+            return {}
+
+        p_col = _find_col(reader.fieldnames, ["player_name", "player", "name"])
+        pos_col = _find_col(reader.fieldnames, ["position"])  # player position
+        slot_col = _find_col(reader.fieldnames, ["lineup_slot", "slot_position"])  # lineup slot
+
+        for row in reader:
+            raw_name = (row.get(p_col) or "").strip() if p_col else ""
+            if not raw_name:
+                continue
+            name = _strip_ir_suffix(raw_name)
+            # Prefer explicit player position (single token)
+            pos = (row.get(pos_col) or "").strip() if pos_col else ""
+            # Clean up any multi-token eligible position strings like 'RB/WR/TE'
+            if "/" in pos:
+                # pick the first token heuristically (shouldn't occur with export fix)
+                pos = pos.split("/")[0].strip()
+            if not pos and slot_col:
+                slot = (row.get(slot_col) or "").strip().upper()
+                if slot in ("QB", "RB", "WR", "TE", "K", "D/ST", "DST"):
+                    pos = "D/ST" if slot in ("D/ST", "DST") else slot
+                # ignore IR/Bench/Flex for primary position
+            if pos:
+                pos_map[name.lower()].append(pos)
+
+    return dict(pos_map)
 
 
 # ----------------------------- Calculations --------------------------------
@@ -206,6 +277,8 @@ def compute_metrics(name: str, team: str, glist: List[PlayerGame]) -> PlayerMetr
     return PlayerMetrics(
         name=name,
         team=team or "Free Agent",
+        position="",
+        positions_all="",
         total_actual=total_actual,
         total_expected=total_expected,
         games=games,
@@ -268,6 +341,9 @@ def write_report(out_csv: str, metrics: List[PlayerMetrics]) -> None:
     fieldnames = [
         "player_name",
         "team",
+        "position",
+        "positions_all",
+        "recommendation",
         "games",
         "total_points",
         "expected_points",
@@ -282,6 +358,34 @@ def write_report(out_csv: str, metrics: List[PlayerMetrics]) -> None:
     # Sort report by team then player name for readability
     metrics_sorted = sorted(metrics, key=lambda m: (m.team or "Free Agent", m.name))
 
+    def _recommendation(m: PlayerMetrics) -> str:
+        cat = (m.category or "").lower()
+        score = 0
+        if "waiver" in cat:
+            score += 3
+        if "buy-low" in cat:
+            score += 2
+        if "sell-high" in cat:
+            score -= 3
+        try:
+            recent = float(m.recent_avg or 0)
+        except Exception:
+            recent = 0
+        try:
+            ratio = float(m.ratio or 0)
+        except Exception:
+            ratio = 0
+        if (m.team or "").strip().lower() == "free agent":
+            if recent >= 8:
+                score += 1
+            elif recent <= 3:
+                score -= 1
+        if m.total_expected > 0 and ratio < 0.85:
+            score += 1
+        if m.total_expected > 0 and ratio > 1.2:
+            score -= 1
+        return "GREEN" if score >= 2 else "RED"
+
     with open(out_csv, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
@@ -289,6 +393,9 @@ def write_report(out_csv: str, metrics: List[PlayerMetrics]) -> None:
             writer.writerow({
                 "player_name": m.name,
                 "team": m.team or "Free Agent",
+                "position": m.position,
+                "positions_all": m.positions_all,
+                "recommendation": _recommendation(m),
                 "games": m.games,
                 "total_points": round(m.total_actual, 3),
                 "expected_points": round(m.total_expected, 3),
@@ -379,12 +486,23 @@ def main(argv: Optional[List[str]] = None) -> int:
     # Load data
     ownership = load_rosters(args.rosters)
     games = load_player_games(args.players)
+    positions_map = load_player_positions(args.players)
 
     # Aggregate metrics
     metrics: List[PlayerMetrics] = []
     for name, glist in games.items():
-        team = ownership.get(name.lower(), "Free Agent")
+        # Match using stripped name for robustness when CSVs contain IR annotations
+        base_name = _strip_ir_suffix(name)
+        team = ownership.get(base_name.lower(), "Free Agent")
         m = compute_metrics(name, team, glist)
+        # Populate player position fields from observed positions
+        pos_list = positions_map.get(base_name.lower(), [])
+        if pos_list:
+            counts = Counter([p.strip() for p in pos_list if p and p.strip()])
+            if counts:
+                # primary position = most frequent observed, tie-break by alpha
+                m.position = max(counts.items(), key=lambda kv: (kv[1], kv[0]))[0]
+                m.positions_all = m.position
         metrics.append(m)
 
     annotated, cats = tag_categories(metrics)
@@ -399,4 +517,3 @@ def main(argv: Optional[List[str]] = None) -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-

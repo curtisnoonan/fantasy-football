@@ -84,10 +84,14 @@ def main(argv: list[str]) -> int:
 
         if args.mode in ("matchups", "all"):
             if args.week is None:
-                # Try to infer current week, else warn
-                week = getattr(league, "current_week", None)
-                if not isinstance(week, int):
-                    log.error("--week is required for matchups")
+                # Try to infer current week; coerce to int if possible
+                cw = getattr(league, "current_week", None)
+                try:
+                    week = int(cw) if cw is not None else None
+                except Exception:
+                    week = None
+                if week is None:
+                    log.error("--week is required for matchups (could not infer current week)")
                     return 4
             else:
                 week = args.week
@@ -95,14 +99,8 @@ def main(argv: list[str]) -> int:
             log.info("Exported matchups (week %s) -> %s", week, path)
 
         if args.mode in ("player-stats", "all"):
-            weeks = None
-            if args.week is not None:
-                weeks = [args.week]
-            elif getattr(args, "all_weeks", False) is False and args.mode == "player-stats":
-                # If user didn't request all weeks explicitly and no week provided, default to current week only
-                cw = getattr(league, "current_week", None)
-                if isinstance(cw, int):
-                    weeks = [cw]
+            # Default to all weeks up to current unless a specific week is provided
+            weeks = [args.week] if args.week is not None else None
             p_path = export_player_stats(league, cfg.output_dir, cfg.season, weeks=weeks)
             if weeks is None:
                 log.info("Exported player stats (1..current_week) -> %s", p_path)
