@@ -40,6 +40,7 @@ class APIConfig:
     cache_path: str = "data/cache/underdog_lines.json"
     cache_ttl_minutes: int = 60
     offline_lines_path: str = "data/lines_sample.json"
+    sport_filter: Optional[str] = "NFL"
 
 
 @dataclass
@@ -94,6 +95,7 @@ class Settings:
                 cache_path=api.get("cache_path", "data/cache/underdog_lines.json"),
                 cache_ttl_minutes=int(api.get("cache_ttl_minutes", 60)),
                 offline_lines_path=api.get("offline_lines_path", "data/lines_sample.json"),
+                sport_filter=api.get("sport_filter", "NFL"),
             ),
             matching=MatchingConfig(
                 name_strategy=matching.get("name_strategy", "case_insensitive"),

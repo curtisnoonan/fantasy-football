@@ -75,6 +75,7 @@ def parse_args(argv: List[str]) -> argparse.Namespace:
     p.add_argument("--download-lines", action="store_true", help="Fetch live Underdog lines and save to offline JSON before running")
     p.add_argument("--api-endpoint", default=None, help="Override API endpoint URL for fetching lines")
     p.add_argument("--api-headers", default=None, help="Override API headers as JSON string for fetching lines")
+    p.add_argument("--sport", default=None, help="Filter live lines to a sport (e.g., NFL) during normalization")
     p.add_argument("--verbose", "-v", action="count", default=0, help="Increase verbosity (-v or -vv)")
     return p.parse_args(argv)
 
@@ -103,6 +104,8 @@ def main(argv: List[str] | None = None) -> int:
             settings.api.headers = _json.loads(ns.api_headers)
         except Exception:
             settings.api.headers = {}
+    if ns.sport:
+        settings.api.sport_filter = ns.sport
 
     ensure_dirs(settings)
 
@@ -150,7 +153,7 @@ def main(argv: List[str] | None = None) -> int:
 
             logger.info("Fetching live lines from API...")
             raw = fetch_underdog_lines(settings.api.endpoint_url, settings.api.headers)
-            live_lines = normalize_payload(raw)
+            live_lines = normalize_payload(raw, sport_filter=settings.api.sport_filter)
             if live_lines:
                 import json as _json
                 outp = settings.api.offline_lines_path
@@ -172,6 +175,7 @@ def main(argv: List[str] | None = None) -> int:
         cache_path=settings.api.cache_path,
         cache_ttl_minutes=settings.api.cache_ttl_minutes,
         offline_lines_path=settings.api.offline_lines_path,
+        sport_filter=settings.api.sport_filter,
     )
     logger.info(f"Loaded {len(lines)} lines")
 

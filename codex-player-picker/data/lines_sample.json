@@ -1,27 +1,842 @@
 [
   {
-    "player_name": "Derrick Henry",
-    "team": "TEN",
-    "pos": "RB",
+    "player_name": "Chase Brown",
+    "team": null,
+    "pos": null,
     "stat_category": "rushing_yards",
-    "line_value": 88.5,
+    "line_value": 44.5,
     "source": "underdog"
   },
   {
-    "player_name": "Christian McCaffrey",
-    "team": "SF",
-    "pos": "RB",
-    "stat_category": "rushing_yards",
-    "line_value": 90.5,
+    "player_name": "Chase Brown",
+    "team": null,
+    "pos": null,
+    "stat_category": "receiving_yards",
+    "line_value": 18.5,
     "source": "underdog"
   },
   {
-    "player_name": "Nick Chubb",
-    "team": "CLE",
-    "pos": "RB",
+    "player_name": "Chase Brown",
+    "team": null,
+    "pos": null,
+    "stat_category": "chase brown fantasy points o/u",
+    "line_value": 10.85,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Chase Brown",
+    "team": null,
+    "pos": null,
     "stat_category": "rushing_yards",
-    "line_value": 79.5,
+    "line_value": 66.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Chase Brown",
+    "team": null,
+    "pos": null,
+    "stat_category": "chase brown longest reception o/u",
+    "line_value": 10.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Chase Brown",
+    "team": null,
+    "pos": null,
+    "stat_category": "chase brown longest rush o/u",
+    "line_value": 10.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Chase Brown",
+    "team": null,
+    "pos": null,
+    "stat_category": "rushing_yards",
+    "line_value": 10.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Chase Brown",
+    "team": null,
+    "pos": null,
+    "stat_category": "chase brown 1q receptions o/u",
+    "line_value": 0.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Chase Brown",
+    "team": null,
+    "pos": null,
+    "stat_category": "chase brown 1h rec yards o/u",
+    "line_value": 7.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Chase Brown",
+    "team": null,
+    "pos": null,
+    "stat_category": "rushing_yards",
+    "line_value": 21.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Ja'Marr Chase",
+    "team": null,
+    "pos": null,
+    "stat_category": "receiving_yards",
+    "line_value": 76.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Ja'Marr Chase",
+    "team": null,
+    "pos": null,
+    "stat_category": "ja'marr chase fantasy points o/u",
+    "line_value": 15.15,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Ja'Marr Chase",
+    "team": null,
+    "pos": null,
+    "stat_category": "ja'marr chase longest reception o/u",
+    "line_value": 23.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Ja'Marr Chase",
+    "team": null,
+    "pos": null,
+    "stat_category": "ja'marr chase 1q rec yards o/u",
+    "line_value": 12.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Ja'Marr Chase",
+    "team": null,
+    "pos": null,
+    "stat_category": "ja'marr chase 1h rec yards o/u",
+    "line_value": 34.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Ja'Marr Chase",
+    "team": null,
+    "pos": null,
+    "stat_category": "ja'marr chase 1+ reception in each quarter o/u",
+    "line_value": 0.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Tee Higgins",
+    "team": null,
+    "pos": null,
+    "stat_category": "receiving_yards",
+    "line_value": 48.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Tee Higgins",
+    "team": null,
+    "pos": null,
+    "stat_category": "tee higgins fantasy points o/u",
+    "line_value": 10.45,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Tee Higgins",
+    "team": null,
+    "pos": null,
+    "stat_category": "tee higgins longest reception o/u",
+    "line_value": 19.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Tee Higgins",
+    "team": null,
+    "pos": null,
+    "stat_category": "tee higgins 1q rec yards o/u",
+    "line_value": 6.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Tee Higgins",
+    "team": null,
+    "pos": null,
+    "stat_category": "tee higgins 1h rec yards o/u",
+    "line_value": 20.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Jaylen Warren",
+    "team": null,
+    "pos": null,
+    "stat_category": "rushing_yards",
+    "line_value": 49.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Jaylen Warren",
+    "team": null,
+    "pos": null,
+    "stat_category": "receiving_yards",
+    "line_value": 18.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Jaylen Warren",
+    "team": null,
+    "pos": null,
+    "stat_category": "jaylen warren rush attempts o/u",
+    "line_value": 12.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Jaylen Warren",
+    "team": null,
+    "pos": null,
+    "stat_category": "jaylen warren fantasy points o/u",
+    "line_value": 12.95,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Jaylen Warren",
+    "team": null,
+    "pos": null,
+    "stat_category": "rushing_yards",
+    "line_value": 71.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Jaylen Warren",
+    "team": null,
+    "pos": null,
+    "stat_category": "jaylen warren longest reception o/u",
+    "line_value": 11.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Jaylen Warren",
+    "team": null,
+    "pos": null,
+    "stat_category": "jaylen warren longest rush o/u",
+    "line_value": 12.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Jaylen Warren",
+    "team": null,
+    "pos": null,
+    "stat_category": "rushing_yards",
+    "line_value": 11.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Jaylen Warren",
+    "team": null,
+    "pos": null,
+    "stat_category": "jaylen warren 1q receptions o/u",
+    "line_value": 0.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Jaylen Warren",
+    "team": null,
+    "pos": null,
+    "stat_category": "jaylen warren 1h rec yards o/u",
+    "line_value": 8.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Jaylen Warren",
+    "team": null,
+    "pos": null,
+    "stat_category": "rushing_yards",
+    "line_value": 22.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "DK Metcalf",
+    "team": null,
+    "pos": null,
+    "stat_category": "receiving_yards",
+    "line_value": 65.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "DK Metcalf",
+    "team": null,
+    "pos": null,
+    "stat_category": "dk metcalf receptions o/u",
+    "line_value": 4.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "DK Metcalf",
+    "team": null,
+    "pos": null,
+    "stat_category": "dk metcalf fantasy points o/u",
+    "line_value": 12.55,
+    "source": "underdog"
+  },
+  {
+    "player_name": "DK Metcalf",
+    "team": null,
+    "pos": null,
+    "stat_category": "dk metcalf longest reception o/u",
+    "line_value": 26.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "DK Metcalf",
+    "team": null,
+    "pos": null,
+    "stat_category": "dk metcalf 1q rec yards o/u",
+    "line_value": 10.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "DK Metcalf",
+    "team": null,
+    "pos": null,
+    "stat_category": "dk metcalf 1h rec yards o/u",
+    "line_value": 31.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Kaleb Johnson",
+    "team": null,
+    "pos": null,
+    "stat_category": "rushing_yards",
+    "line_value": 17.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Kaleb Johnson",
+    "team": null,
+    "pos": null,
+    "stat_category": "kaleb johnson longest rush o/u",
+    "line_value": 8.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Kaleb Johnson",
+    "team": null,
+    "pos": null,
+    "stat_category": "rushing_yards",
+    "line_value": 1.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Kaleb Johnson",
+    "team": null,
+    "pos": null,
+    "stat_category": "rushing_yards",
+    "line_value": 6.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Jonnu Smith",
+    "team": null,
+    "pos": null,
+    "stat_category": "receiving_yards",
+    "line_value": 27.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Jonnu Smith",
+    "team": null,
+    "pos": null,
+    "stat_category": "jonnu smith receptions o/u",
+    "line_value": 3.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Jonnu Smith",
+    "team": null,
+    "pos": null,
+    "stat_category": "jonnu smith longest reception o/u",
+    "line_value": 13.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Jonnu Smith",
+    "team": null,
+    "pos": null,
+    "stat_category": "jonnu smith 1q rec yards o/u",
+    "line_value": 2.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Jonnu Smith",
+    "team": null,
+    "pos": null,
+    "stat_category": "jonnu smith 1h rec yards o/u",
+    "line_value": 11.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Andrei Iosivas",
+    "team": null,
+    "pos": null,
+    "stat_category": "receiving_yards",
+    "line_value": 18.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Andrei Iosivas",
+    "team": null,
+    "pos": null,
+    "stat_category": "andrei iosivas longest reception o/u",
+    "line_value": 12.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Andrei Iosivas",
+    "team": null,
+    "pos": null,
+    "stat_category": "andrei iosivas 1h rec yards o/u",
+    "line_value": 5.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Kenneth Gainwell",
+    "team": null,
+    "pos": null,
+    "stat_category": "rushing_yards",
+    "line_value": 27.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Kenneth Gainwell",
+    "team": null,
+    "pos": null,
+    "stat_category": "receiving_yards",
+    "line_value": 17.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Kenneth Gainwell",
+    "team": null,
+    "pos": null,
+    "stat_category": "kenneth gainwell fantasy points o/u",
+    "line_value": 7.85,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Kenneth Gainwell",
+    "team": null,
+    "pos": null,
+    "stat_category": "rushing_yards",
+    "line_value": 48.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Kenneth Gainwell",
+    "team": null,
+    "pos": null,
+    "stat_category": "kenneth gainwell longest reception o/u",
+    "line_value": 9.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Kenneth Gainwell",
+    "team": null,
+    "pos": null,
+    "stat_category": "kenneth gainwell longest rush o/u",
+    "line_value": 10.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Kenneth Gainwell",
+    "team": null,
+    "pos": null,
+    "stat_category": "rushing_yards",
+    "line_value": 4.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Kenneth Gainwell",
+    "team": null,
+    "pos": null,
+    "stat_category": "kenneth gainwell 1q receptions o/u",
+    "line_value": 0.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Kenneth Gainwell",
+    "team": null,
+    "pos": null,
+    "stat_category": "kenneth gainwell 1h rec yards o/u",
+    "line_value": 6.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Kenneth Gainwell",
+    "team": null,
+    "pos": null,
+    "stat_category": "rushing_yards",
+    "line_value": 11.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Kenneth Gainwell",
+    "team": null,
+    "pos": null,
+    "stat_category": "kenneth gainwell 1h receptions o/u",
+    "line_value": 1.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Pat Freiermuth",
+    "team": null,
+    "pos": null,
+    "stat_category": "receiving_yards",
+    "line_value": 14.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Pat Freiermuth",
+    "team": null,
+    "pos": null,
+    "stat_category": "pat freiermuth receptions o/u",
+    "line_value": 1.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Pat Freiermuth",
+    "team": null,
+    "pos": null,
+    "stat_category": "pat freiermuth longest reception o/u",
+    "line_value": 10.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Pat Freiermuth",
+    "team": null,
+    "pos": null,
+    "stat_category": "pat freiermuth 1h rec yards o/u",
+    "line_value": 5.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Roman Wilson",
+    "team": null,
+    "pos": null,
+    "stat_category": "receiving_yards",
+    "line_value": 7.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Roman Wilson",
+    "team": null,
+    "pos": null,
+    "stat_category": "roman wilson longest reception o/u",
+    "line_value": 7.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Noah Fant",
+    "team": null,
+    "pos": null,
+    "stat_category": "receiving_yards",
+    "line_value": 27.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Noah Fant",
+    "team": null,
+    "pos": null,
+    "stat_category": "noah fant receptions o/u",
+    "line_value": 3.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Noah Fant",
+    "team": null,
+    "pos": null,
+    "stat_category": "noah fant longest reception o/u",
+    "line_value": 12.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Noah Fant",
+    "team": null,
+    "pos": null,
+    "stat_category": "noah fant 1q rec yards o/u",
+    "line_value": 0.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Noah Fant",
+    "team": null,
+    "pos": null,
+    "stat_category": "noah fant 1q receptions o/u",
+    "line_value": 0.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Noah Fant",
+    "team": null,
+    "pos": null,
+    "stat_category": "noah fant 1h rec yards o/u",
+    "line_value": 11.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Samaje Perine",
+    "team": null,
+    "pos": null,
+    "stat_category": "rushing_yards",
+    "line_value": 17.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Samaje Perine",
+    "team": null,
+    "pos": null,
+    "stat_category": "receiving_yards",
+    "line_value": 9.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Samaje Perine",
+    "team": null,
+    "pos": null,
+    "stat_category": "samaje perine receptions o/u",
+    "line_value": 1.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Samaje Perine",
+    "team": null,
+    "pos": null,
+    "stat_category": "rushing_yards",
+    "line_value": 29.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Samaje Perine",
+    "team": null,
+    "pos": null,
+    "stat_category": "samaje perine longest reception o/u",
+    "line_value": 7.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Samaje Perine",
+    "team": null,
+    "pos": null,
+    "stat_category": "samaje perine longest rush o/u",
+    "line_value": 7.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Samaje Perine",
+    "team": null,
+    "pos": null,
+    "stat_category": "rushing_yards",
+    "line_value": 1.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Samaje Perine",
+    "team": null,
+    "pos": null,
+    "stat_category": "samaje perine 1h rec yards o/u",
+    "line_value": 1.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Samaje Perine",
+    "team": null,
+    "pos": null,
+    "stat_category": "rushing_yards",
+    "line_value": 6.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Drew Sample",
+    "team": null,
+    "pos": null,
+    "stat_category": "receiving_yards",
+    "line_value": 5.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Drew Sample",
+    "team": null,
+    "pos": null,
+    "stat_category": "drew sample longest reception o/u",
+    "line_value": 5.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Aaron Rodgers",
+    "team": null,
+    "pos": null,
+    "stat_category": "passing_yards",
+    "line_value": 219.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Darnell Washington",
+    "team": null,
+    "pos": null,
+    "stat_category": "receiving_yards",
+    "line_value": 21.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Darnell Washington",
+    "team": null,
+    "pos": null,
+    "stat_category": "darnell washington receptions o/u",
+    "line_value": 2.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Aaron Rodgers",
+    "team": null,
+    "pos": null,
+    "stat_category": "aaron rodgers rush attempts o/u",
+    "line_value": 1.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Aaron Rodgers",
+    "team": null,
+    "pos": null,
+    "stat_category": "aaron rodgers pass attempts o/u",
+    "line_value": 29.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Aaron Rodgers",
+    "team": null,
+    "pos": null,
+    "stat_category": "aaron rodgers completions o/u",
+    "line_value": 21.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Aaron Rodgers",
+    "team": null,
+    "pos": null,
+    "stat_category": "aaron rodgers fantasy points o/u",
+    "line_value": 17.15,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Aaron Rodgers",
+    "team": null,
+    "pos": null,
+    "stat_category": "rushing_yards",
+    "line_value": 225.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Aaron Rodgers",
+    "team": null,
+    "pos": null,
+    "stat_category": "aaron rodgers longest completion o/u",
+    "line_value": 35.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Darnell Washington",
+    "team": null,
+    "pos": null,
+    "stat_category": "darnell washington longest reception o/u",
+    "line_value": 12.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Aaron Rodgers",
+    "team": null,
+    "pos": null,
+    "stat_category": "passing_yards",
+    "line_value": 48.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Darnell Washington",
+    "team": null,
+    "pos": null,
+    "stat_category": "darnell washington 1q rec yards o/u",
+    "line_value": 0.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Aaron Rodgers",
+    "team": null,
+    "pos": null,
+    "stat_category": "passing_yards",
+    "line_value": 112.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Darnell Washington",
+    "team": null,
+    "pos": null,
+    "stat_category": "darnell washington 1h rec yards o/u",
+    "line_value": 9.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Aaron Rodgers",
+    "team": null,
+    "pos": null,
+    "stat_category": "aaron rodgers completion percentage o/u",
+    "line_value": 69.2,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Joe Flacco",
+    "team": null,
+    "pos": null,
+    "stat_category": "passing_yards",
+    "line_value": 236.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Joe Flacco",
+    "team": null,
+    "pos": null,
+    "stat_category": "joe flacco pass attempts o/u",
+    "line_value": 36.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Joe Flacco",
+    "team": null,
+    "pos": null,
+    "stat_category": "joe flacco fantasy points o/u",
+    "line_value": 14.55,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Joe Flacco",
+    "team": null,
+    "pos": null,
+    "stat_category": "rushing_yards",
+    "line_value": 238.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Joe Flacco",
+    "team": null,
+    "pos": null,
+    "stat_category": "joe flacco longest completion o/u",
+    "line_value": 33.5,
+    "source": "underdog"
+  },
+  {
+    "player_name": "Joe Flacco",
+    "team": null,
+    "pos": null,
+    "stat_category": "passing_yards",
+    "line_value": 47.5,
     "source": "underdog"
   }
 ]
-

@@ -28,8 +28,10 @@ class RecommenderGUI(tk.Tk):
         # API inputs (optional)
         self.api_endpoint = tk.StringVar(value="")
         self.api_headers = tk.StringVar(value="{}")
-        self.api_preset = tk.StringVar(value="Underdog v3 over_under_lines")
+        self.api_preset = tk.StringVar(value="Underdog v5 over_under_lines")
         self.raw_save_path = tk.StringVar(value="data/underdog_raw.json")
+        self.sport_filter = tk.StringVar(value="NFL")
+        self.header_preset = tk.StringVar(value="Browser-like (UA+Accept)")
 
         # Projection column mapping (optional)
         self.player_col = tk.StringVar(value="")
@@ -75,6 +77,7 @@ class RecommenderGUI(tk.Tk):
         # API endpoint & headers
         ttk.Label(top, text="Preset:").grid(row=4, column=0, sticky=tk.W, pady=(6, 0))
         presets = [
+            "Underdog v5 over_under_lines",
             "Underdog v3 over_under_lines",
             "Underdog v1 over_under_lines",
         ]
@@ -82,14 +85,28 @@ class RecommenderGUI(tk.Tk):
         preset_box.grid(row=4, column=1, sticky=tk.W, pady=(6, 0))
         preset_box.bind("<<ComboboxSelected>>", self._apply_preset)
 
-        ttk.Label(top, text="API Endpoint:").grid(row=4, column=0, sticky=tk.W, pady=(6, 0))
-        ttk.Entry(top, textvariable=self.api_endpoint, width=50).grid(row=4, column=1, sticky=tk.W, pady=(6, 0))
-        ttk.Button(top, text="Fetch Live Lines", command=self._fetch_lines_clicked).grid(row=4, column=2, padx=5, pady=(6, 0))
+        ttk.Label(top, text="API Endpoint:").grid(row=5, column=0, sticky=tk.W, pady=(6, 0))
+        ttk.Entry(top, textvariable=self.api_endpoint, width=50).grid(row=5, column=1, sticky=tk.W, pady=(6, 0))
+        ttk.Button(top, text="Fetch Live Lines", command=self._fetch_lines_clicked).grid(row=5, column=2, padx=5, pady=(6, 0))
+        ttk.Button(top, text="Test Fetch", command=self._test_fetch_clicked).grid(row=5, column=3, padx=5, pady=(6, 0))
 
-        ttk.Label(top, text="API Headers (JSON):").grid(row=5, column=0, sticky=tk.W)
-        ttk.Entry(top, textvariable=self.api_headers, width=50).grid(row=5, column=1, sticky=tk.W)
-        ttk.Label(top, text="Save Raw To:").grid(row=5, column=2, sticky=tk.W)
-        ttk.Entry(top, textvariable=self.raw_save_path, width=28).grid(row=5, column=3, sticky=tk.W)
+        ttk.Label(top, text="Header Preset:").grid(row=6, column=0, sticky=tk.W)
+        hp = ttk.Combobox(top, textvariable=self.header_preset, values=[
+            "Browser-like (UA+Accept)",
+            "Minimal (Accept only)",
+            "Custom (manual JSON)",
+        ], state="readonly", width=28)
+        hp.grid(row=6, column=1, sticky=tk.W)
+        hp.bind("<<ComboboxSelected>>", self._apply_header_preset)
+
+        ttk.Label(top, text="API Headers (JSON):").grid(row=6, column=2, sticky=tk.W)
+        ttk.Entry(top, textvariable=self.api_headers, width=40).grid(row=6, column=3, sticky=tk.W)
+
+        ttk.Label(top, text="Save Raw To:").grid(row=7, column=2, sticky=tk.W)
+        ttk.Entry(top, textvariable=self.raw_save_path, width=40).grid(row=7, column=3, sticky=tk.W)
+
+        ttk.Label(top, text="Sport Filter:").grid(row=7, column=0, sticky=tk.W, pady=(6, 0))
+        ttk.Entry(top, textvariable=self.sport_filter, width=20).grid(row=7, column=1, sticky=tk.W, pady=(6, 0))
 
         # Output path
         ttk.Label(top, text="Output CSV:").grid(row=3, column=0, sticky=tk.W, pady=(6, 0))
@@ -200,6 +217,8 @@ class RecommenderGUI(tk.Tk):
                     self.api_headers.set(json.dumps(settings.api.headers))
                 except Exception:
                     pass
+            if getattr(settings.api, "sport_filter", None):
+                self.sport_filter.set(settings.api.sport_filter)
             if settings.output.out_path:
                 self.out_path.set(settings.output.out_path)
             # projections column mapping
@@ -232,7 +251,16 @@ class RecommenderGUI(tk.Tk):
             settings.recommend.rule = self.rule.get()
             settings.matching.team_required = bool(self.team_required.get())
             settings.matching.position_required = bool(self.position_required.get())
+            # Apply API settings from UI so Run can use live data
+            ui_endpoint = (self.api_endpoint.get() or "").strip()
+            if ui_endpoint:
+                settings.api.endpoint_url = ui_endpoint
+                settings.api.enabled = True
+                # Respect header preset / manual JSON
+                settings.api.headers = self._effective_headers()
+            # Always reflect current file paths / filters
             settings.api.offline_lines_path = self.offline_lines_path.get()
+            settings.api.sport_filter = self.sport_filter.get().strip() or None
             settings.output.out_path = self.out_path.get()
 
             ensure_dirs(settings)
@@ -264,6 +292,7 @@ class RecommenderGUI(tk.Tk):
                 cache_path=settings.api.cache_path,
                 cache_ttl_minutes=settings.api.cache_ttl_minutes,
                 offline_lines_path=settings.api.offline_lines_path,
+                sport_filter=settings.api.sport_filter,
             )
 
             # Compute recs
@@ -358,6 +387,7 @@ class RecommenderGUI(tk.Tk):
                     "cache_path": "data/cache/underdog_lines.json",
                     "cache_ttl_minutes": 60,
                     "offline_lines_path": self.offline_lines_path.get(),
+                    "sport_filter": self.sport_filter.get().strip() or None,
                 },
                 "matching": {
                     "name_strategy": "case_insensitive",
@@ -472,12 +502,27 @@ class RecommenderGUI(tk.Tk):
                 self.status_var.set("Ready")
                 return
 
-            headers = self._parse_headers_safely(self.api_headers.get())
+            headers = self._effective_headers()
 
             from .underdog import fetch_underdog_lines, normalize_payload, lines_to_normalized_json
 
-            raw = fetch_underdog_lines(endpoint, headers)
-            lines = normalize_payload(raw)
+            # Try endpoint with fallbacks (e.g., v5 -> v3 -> v1)
+            endpoints = [endpoint] + self._endpoint_fallbacks(endpoint)
+            used_endpoint = None
+            last_err = None
+            raw = None
+            for ep in endpoints:
+                try:
+                    raw = fetch_underdog_lines(ep, headers)
+                    used_endpoint = ep
+                    break
+                except Exception as e:
+                    last_err = e
+                    continue
+            if raw is None:
+                raise last_err or RuntimeError("Failed to fetch endpoint(s)")
+
+            lines = normalize_payload(raw, sport_filter=self.sport_filter.get().strip() or None)
             if not lines:
                 messagebox.showwarning("No Lines", "Fetched data but could not normalize any lines. Save raw JSON and share a sample to add support.")
                 self.status_var.set("No lines normalized")
@@ -503,14 +548,117 @@ class RecommenderGUI(tk.Tk):
                     pass
 
             self.status_var.set(f"Fetched {len(lines)} lines -> {dest}")
-            messagebox.showinfo("Fetch Complete", f"Fetched {len(lines)} lines and saved to:\n{dest}")
+            suffix = "" if used_endpoint == endpoint else f"\n(Used fallback endpoint: {used_endpoint})"
+            messagebox.showinfo("Fetch Complete", f"Fetched {len(lines)} lines and saved to:\n{dest}{suffix}")
+            if used_endpoint and used_endpoint != endpoint:
+                self.api_endpoint.set(used_endpoint)
         except Exception as e:
             messagebox.showerror("Fetch Error", f"Failed to fetch lines: {e}")
             self.status_var.set("Fetch error")
 
+    def _test_fetch_clicked(self) -> None:
+        threading.Thread(target=self._test_fetch_logic, daemon=True).start()
+
+    def _test_fetch_logic(self) -> None:
+        try:
+            self.status_var.set("Testing fetch...")
+            endpoint = self.api_endpoint.get().strip()
+            if not endpoint:
+                messagebox.showwarning("Missing Endpoint", "Please enter API Endpoint URL.")
+                self.status_var.set("Ready")
+                return
+
+            headers = self._effective_headers()
+            from .underdog import fetch_underdog_lines, normalize_payload
+
+            # Try endpoint with fallbacks
+            endpoints = [endpoint] + self._endpoint_fallbacks(endpoint)
+            used_endpoint = None
+            last_err = None
+            raw = None
+            for ep in endpoints:
+                try:
+                    raw = fetch_underdog_lines(ep, headers)
+                    used_endpoint = ep
+                    break
+                except Exception as e:
+                    last_err = e
+                    continue
+            if raw is None:
+                raise last_err or RuntimeError("Failed to fetch endpoint(s)")
+            total_lines = 0
+            if isinstance(raw, dict):
+                for key in ("over_under_lines", "over_unders", "lines"):
+                    if isinstance(raw.get(key), list):
+                        total_lines = len(raw.get(key))
+                        break
+
+            all_norm = normalize_payload(raw, sport_filter=None)
+            nfl_norm = normalize_payload(raw, sport_filter=self.sport_filter.get().strip() or None)
+
+            msg = (
+                f"Endpoint OK ({used_endpoint}). Raw lists: {total_lines} lines.\n"
+                f"Normalized (all sports): {len(all_norm)} lines.\n"
+                f"Normalized ({self.sport_filter.get().strip() or 'no sport filter'}): {len(nfl_norm)} lines."
+            )
+            messagebox.showinfo("Test Fetch", msg)
+            self.status_var.set("Test fetch complete")
+        except Exception as e:
+            messagebox.showerror("Test Fetch Error", f"Failed: {e}")
+            self.status_var.set("Test fetch error")
+
+    def _apply_header_preset(self, *_):
+        sel = self.header_preset.get()
+        if sel == "Browser-like (UA+Accept)":
+            import json
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36",
+                "Accept": "application/json",
+            }
+            self.api_headers.set(json.dumps(headers))
+        elif sel == "Minimal (Accept only)":
+            import json
+            self.api_headers.set(json.dumps({"Accept": "application/json"}))
+        else:
+            # Custom: leave as is
+            pass
+
+    def _effective_headers(self) -> dict:
+        # Ensure at least a browser-like UA and Accept if not provided
+        headers = self._parse_headers_safely(self.api_headers.get())
+        if not headers.get("User-Agent") and self.header_preset.get() != "Custom (manual JSON)":
+            headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36"
+        headers.setdefault("Accept", "application/json")
+        return headers
+
+    @staticmethod
+    def _endpoint_fallbacks(url: str) -> list:
+        alts = []
+        try:
+            if "/v5/" in url:
+                alts.append(url.replace("/v5/", "/v3/"))
+                alts.append(url.replace("/v5/", "/v1/"))
+            elif "/v4/" in url:
+                alts.append(url.replace("/v4/", "/v3/"))
+                alts.append(url.replace("/v4/", "/v1/"))
+            elif "/v3/" in url:
+                alts.append(url.replace("/v3/", "/v1/"))
+        except Exception:
+            pass
+        # De-duplicate while preserving order
+        seen = set()
+        ordered = []
+        for ep in alts:
+            if ep not in seen:
+                seen.add(ep)
+                ordered.append(ep)
+        return ordered
+
     def _apply_preset(self, *_):
         sel = self.api_preset.get()
-        if sel == "Underdog v3 over_under_lines":
+        if sel == "Underdog v5 over_under_lines":
+            self.api_endpoint.set("https://api.underdogfantasy.com/beta/v5/over_under_lines")
+        elif sel == "Underdog v3 over_under_lines":
             self.api_endpoint.set("https://api.underdogfantasy.com/beta/v3/over_under_lines")
         elif sel == "Underdog v1 over_under_lines":
             self.api_endpoint.set("https://api.underdogfantasy.com/v1/over_under_lines")

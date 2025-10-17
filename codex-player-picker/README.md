@@ -50,7 +50,51 @@ GUI tips
 - Use "Prepare Folders & Samples" to create folders, copy sample projections/lines to your chosen paths if missing, and save config.
 - Click "Run" to compute recommendations; "Save CSV" to export the current table.
 - Use endpoint presets in the GUI to prefill a common Underdog Pick'em endpoint.
+- Use "Header Preset" to quickly apply a browser-like User-Agent and Accept headers, or switch to minimal/custom.
+- Use "Test Fetch" to validate connectivity and see how many lines normalize (all sports vs. your Sport Filter) without writing files.
 - Use "Fetch Live Lines" to download and normalize live lines into your chosen `Lines JSON`. Optionally save the raw response for debugging.
+
+Underdog Pick'em API
+
+- Endpoint: `https://api.underdogfantasy.com/beta/v5/over_under_lines` returns current pick’em (higher/lower) prop lines across sports.
+- Auth: No API key required for public data. Include basic headers to mimic a browser.
+  - Headers example: `{ "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Accept": "application/json" }`
+- Filtering NFL: Use the GUI "Sport Filter" (default `NFL`) or CLI `--sport NFL`. The normalizer links over_under_lines -> appearances -> players and filters by players with `sport_id == "NFL"`.
+- Rate limiting: Be respectful. Fetch infrequently and use the cached/offline JSON for development.
+
+Example calls
+
+- curl:
+
+  `curl "https://api.underdogfantasy.com/beta/v5/over_under_lines" -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)" -H "Accept: application/json"`
+
+- Python (requests):
+
+  ```python
+  import requests
+
+  url = "https://api.underdogfantasy.com/beta/v5/over_under_lines"
+  headers = {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+      "Accept": "application/json",
+  }
+  resp = requests.get(url, headers=headers, timeout=15)
+  data = resp.json()
+
+  # Example NFL filter (v5 shape):
+  players = {p["id"]: p for p in data.get("players", []) if p.get("sport_id") == "NFL"}
+  apps = {a["id"]: a for a in data.get("appearances", [])}
+  lines = []
+  for item in data.get("over_under_lines", []):
+      app_id = ((item.get("over_under") or {}).get("appearance_stat") or {}).get("appearance_id")
+      app = apps.get(app_id)
+      if not app or app.get("player_id") not in players:
+          continue
+      player = players[app["player_id"]]
+      stat_label = ((item.get("over_under") or {}).get("appearance_stat") or {}).get("display_stat")
+      value = item.get("stat_value")
+      lines.append((player.get("full_name") or f"{player.get('first_name','')} {player.get('last_name','')}", stat_label, value))
+  ```
 
 Connecting to live Underdog data
 

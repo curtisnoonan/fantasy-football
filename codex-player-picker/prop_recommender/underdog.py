@@ -105,7 +105,7 @@ def _index_by(items: Any, key: str) -> Dict[Any, Dict[str, Any]]:
     return idx
 
 
-def normalize_payload(data: Any) -> List[Line]:
+def normalize_payload(data: Any, sport_filter: Optional[str] = None) -> List[Line]:
     # Try already-normalized first
     lines = _extract_lines_normalized(data)
     if lines:
@@ -124,6 +124,7 @@ def normalize_payload(data: Any) -> List[Line]:
 
         players_idx: Dict[Any, Dict[str, Any]] = {}
         teams_idx: Dict[Any, Dict[str, Any]] = {}
+        appearances_idx: Dict[Any, Dict[str, Any]] = {}
 
         # Try to find included players/teams arrays
         for pk in ("players", "included_players", "player_list"):
@@ -134,10 +135,25 @@ def normalize_payload(data: Any) -> List[Line]:
             if isinstance(data.get(tk), list):
                 teams_idx = _index_by(data.get(tk), "id") or _index_by(data.get(tk), "team_id")
                 break
+        for ak in ("appearances", "included_appearances", "appearance_list"):
+            if isinstance(data.get(ak), list):
+                appearances_idx = _index_by(data.get(ak), "id") or _index_by(data.get(ak), "appearance_id")
+                break
+
+        # Optionally filter by sport via players.sport_id
+        allowed_player_ids = None
+        if players_idx and sport_filter:
+            sf = str(sport_filter).lower()
+            allowed_player_ids = {
+                pid
+                for pid, p in players_idx.items()
+                if str(p.get("sport_id", "")).lower() == sf or str(p.get("sport", "")).lower() == sf
+            }
 
         def process_items(items):
             for item in items:
                 try:
+                    app_id = None
                     # Try direct fields
                     value = (
                         item.get("line")
@@ -153,6 +169,7 @@ def normalize_payload(data: Any) -> List[Line]:
                     stat_label = (
                         (item.get("over_under") or {}).get("stat_type")
                         or (item.get("over_under") or {}).get("title")
+                        or ((item.get("over_under") or {}).get("appearance_stat") or {}).get("display_stat")
                         or item.get("stat_type")
                         or item.get("category")
                         or item.get("type")
@@ -167,6 +184,18 @@ def normalize_payload(data: Any) -> List[Line]:
 
                     # If only IDs present, try lookup
                     pid = item.get("player_id") or (item.get("over_under") or {}).get("player_id")
+                    if pid is None:
+                        app_id = (
+                            ((item.get("over_under") or {}).get("appearance_stat") or {}).get("appearance_id")
+                            or item.get("appearance_id")
+                        )
+                        if app_id is not None and appearances_idx:
+                            app = _lookup_by_id(appearances_idx, app_id)
+                            if app:
+                                pid = app.get("player_id")
+
+                    if allowed_player_ids is not None and pid is not None and pid not in allowed_player_ids:
+                        continue
                     if not player_name and pid is not None:
                         p = _lookup_by_id(players_idx, pid)
                         if p:
@@ -181,6 +210,10 @@ def normalize_payload(data: Any) -> List[Line]:
 
                     # Team lookup via team_id if needed
                     tid = item.get("team_id") or (item.get("over_under") or {}).get("team_id")
+                    if (not tid) and appearances_idx and app_id is not None:
+                        app = _lookup_by_id(appearances_idx, app_id)
+                        if app:
+                            tid = app.get("team_id")
                     if not team_abbr and tid is not None:
                         t = _lookup_by_id(teams_idx, tid)
                         if t:
@@ -255,7 +288,18 @@ def fetch_underdog_lines(
     # Network may be restricted. We use urllib from stdlib and let callers handle failures.
     import urllib.request
 
-    req = urllib.request.Request(endpoint_url, headers=headers or {})
+    # Merge with sensible defaults that mimic a browser
+    default_headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36",
+        "Accept": "application/json",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Cache-Control": "no-cache",
+    }
+    merged_headers = dict(default_headers)
+    if headers:
+        merged_headers.update(headers)
+
+    req = urllib.request.Request(endpoint_url, headers=merged_headers)
     with urllib.request.urlopen(req, timeout=15) as resp:
         payload = resp.read().decode("utf-8")
         return json.loads(payload)
@@ -269,6 +313,7 @@ def get_lines(
     cache_path: str,
     cache_ttl_minutes: int,
     offline_lines_path: str,
+    sport_filter: Optional[str] = None,
 ) -> List[Line]:
     # Try cache first if exists and fresh
     try:
@@ -288,7 +333,7 @@ def get_lines(
         try:
             raw = fetch_underdog_lines(endpoint_url, headers)
             # Normalize vendor-specific shape if needed
-            lines = normalize_payload(raw)
+            lines = normalize_payload(raw, sport_filter=sport_filter)
             if lines:
                 _write_json(cache_path, lines_to_normalized_json(lines))
                 return lines
